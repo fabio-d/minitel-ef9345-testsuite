@@ -74,7 +74,7 @@ def main():
             # explicitly listed in the command line.
             if explicit_selection:
                 print(f"Warning! {path}: cannot find file", file=sys.stderr)
-        elif path.suffix in [".c", ".h"]:
+        elif path.suffix in [".c", ".cpp", ".h"]:
             c_files.append(str(path))
         elif path.suffix == ".lua":
             lua_files.append(str(path))
