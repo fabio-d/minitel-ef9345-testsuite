@@ -1,0 +1,15 @@
+BasedOnStyle: LLVM
+ColumnLimit: 80
+IndentWidth: 2
+InsertNewlineAtEOF: true
+LineEnding: LF
+UseTab: Never
+
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+InsertBraces: true
