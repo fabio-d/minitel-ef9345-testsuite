@@ -149,6 +149,27 @@ following images:
 Note: by soldering the wire in the way shown above, the power switch on the
 front of the EZ-USB FX2LP board will be in control of our derived 5 V rail too.
 
+### Supporting software
+
+Prerequisites:
+
+```shell
+$ git submodule init && git submodule update  # to checkout firmware/fx2lib
+$ sudo apt install build-essential cycfx2prog sdcc
+```
+
+Firmware for the FX2LP chip is provided in the `firmware` subdirectory and it
+can be compiled and then loaded over USB into the board with:
+
+```shell
+$ cd hw_devboard/firmware
+$ make
+$ sudo cycfx2prog prg:build/firmware.ihx run
+```
+
+The above `cycfx2prog` command will load the firmware into the FX2LP's RAM and
+execute it from there. It will not persist after power cycling.
+
 ## Gallery
 
 <p>
