@@ -155,7 +155,7 @@ Prerequisites:
 
 ```shell
 $ git submodule init && git submodule update  # to checkout firmware/fx2lib
-$ sudo apt install build-essential cycfx2prog sdcc
+$ sudo apt install build-essential cycfx2prog libusb-1.0-0-dev qt6-base-dev sdcc
 ```
 
 Firmware for the FX2LP chip is provided in the `firmware` subdirectory and it
@@ -170,9 +170,34 @@ $ sudo cycfx2prog prg:build/firmware.ihx run
 The above `cycfx2prog` command will load the firmware into the FX2LP's RAM and
 execute it from there. It will not persist after power cycling.
 
+The `host_connector_gui` program can then be started on the host:
+
+```shell
+$ cd hw_devboard/host_connector_gui
+$ qmake6
+$ make
+$ sudo ./host_connector_gui
+```
+
+## Running the tests
+
+After loading the firmware and opening the `host_connector_gui` program, select
+*Device* &rarr; *Connect...* to locate the USB board, then *Device* &rarr;
+*Enable TCP Server...* and confirm the default listen address `127.0.0.1:1234`.
+
+Finally, run a test (e.g. `test_resolutions.py`) with:
+
+```shell
+$ cd ../tests
+$ python3 test_resolutions.py --video-chip 127.0.0.1:1234
+```
+
 ## Gallery
 
 <p>
+<img src="pictures/screenshot_40c.gif" alt="Screenshot of 40 columns mode" height="150" />
+<img src="pictures/screenshot_80c.gif" alt="Screenshot of 40 columns mode" height="150" />
+<img src="pictures/screenshot_colors.png" alt="Screenshot of colored bands" height="150" />
 <img src="pictures/side_view.jpg" alt="A board seen from its left side" height="150" />
 <img src="pictures/everything.jpg" alt="Populated and unpopulated boards" height="150" />
 <img src="pictures/pcb.jpg" alt="The printed circuit" height="150" />

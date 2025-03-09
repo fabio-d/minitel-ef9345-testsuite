@@ -1,0 +1,9 @@
+.qmake.stash
+Makefile
+
+moc_*.cpp
+moc_*.h
+ui_*.h
+
+*.o
+host_connector_gui
