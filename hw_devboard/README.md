@@ -1,14 +1,19 @@
 # Hardware board: USB EF9345/TS9347 Video Adapter
 
 This folder contains the schematics, firmware and host software for running the
-test suite against real EF9345 and TS9347 chips.
+test suite against real EF9345 and TS9347 chips using a custom board.
+
+<p align="center">
+<img src="pictures/main.jpg" alt="Image of two such boards, with the EF9345 and TS9347 video chips" width="50%" />
+</p>
 
 ## Board description
 
-The board hosts the video chip (either EF9345P or TS9347CP/2R00), a 32 KiB RAM
-module for it to store the text buffers and a 74LS373N latch to demultiplex RAM
-addresses. In addition, for the TS9347CP only, an LM393 and some passives
-extract the video composite sync signal from the TS9347CP's analog Y output.
+The custom boards host the video chip (either EF9345P or TS9347CP/2R00), a 32
+KiB RAM module for it to store the text buffers and a 74LS373N latch to
+demultiplex RAM addresses. In addition, for the TS9347CP only, an LM393 and some
+passives extract the video composite sync signal from the TS9347CP's analog Y
+output.
 
 The solder jumper pads (JP1 to JP9) on the back side of the board adapt some
 internal connections to the connected video chip (the EF9345P and TS9347CP/2R00
@@ -35,6 +40,8 @@ Bill of materials with links:
 * C1 and C2 (for the TS9347 only): 10 uF electrolitic capacitors.
 * 2.54 mm male and female pin headers (e.g. from
   [this kit](https://www.aliexpress.com/item/1005006034877497.html)).
+* 3 (EF9345) or 4 (TS9347) 2.54 mm jumpers (e.g. from
+  [this kit](https://www.aliexpress.com/item/4000583368141.html)).
 
 In addition, the board itself needs to be mounted on the
 [EZ-USB FX2LP development board](https://www.aliexpress.com/item/1005005100640836.html),
@@ -42,17 +49,17 @@ which provides the high-speed USB interface to both read/write the video chip's
 registers and, most importantily, streaming the real-time video signal back to
 the host computer at 12 MiB/s.
 
-### FX2 pinout
+### EZ-USB FX2LP board pinout
 
 | FX2 pin     | EF9345P pin | TS9347CP/2R00 pin | Description                  |
 |-------------|-------------|-------------------|------------------------------|
-| **FX2 outputs:**                                                          ||||
+| **Outputs:**                                                              ||||
 | CTL0 (J2.16)| CLK (12)    | CLK (12)          | Video Chip Clock             |
 | PA3 (J2.10) | AS (14)     | AS (14)           | Address Strobe (aka ALE)     |
 | PA4 (J2.9)  | DS (15)     | DS (15)           | Data Strobe (aka ~RD)        |
 | PA5 (J2.8)  | R/~W (16)   | R/~W (16)         | Read/Write (aka ~WR)         |
 | PA6 (J2.7)  | ~CS (26)    | ~CS (20)          | Chip Select                  |
-| **FX2 inputs:**                                                           ||||
+| **Inputs:**                                                               ||||
 | PB0 (J1.15) | I (10)      | G (10)            | Video Signal Value (digital) |
 | PB1 (J1.16) | R (9)       | R (9)             | Video Signal Value (digital) |
 | PB2 (J1.17) | G (8)       | B (8)             | Video Signal Value (digital) |
@@ -77,6 +84,75 @@ through these LEDs: EF9345 = D1 on, TS9347 = D2 on, detection failed = both on.
 
 [<img src="board_v1/plots/board_v1.svg">](board_v1/plots/board_v1.pdf)
 
-### Getting 5 V power (Vusb) from the FX2 development board
+## Customization
 
-TODO
+Before using the board, some customizations are necessary.
+
+### Selecting the video chip
+
+<p align="center">
+<img src="pictures/solder_jumpers.jpg" alt="Solder jumpers JP1-JP9 in EF9345P configuration" height="300" />
+</p>
+
+JP1 to JP9 on the back side of the board need to be bridged with solder,
+depending on the type of video chip to be tested:
+
+* each JPx must be bridged to the left (i.e. by shorting pads 1 and 2) for the
+  EF9345P, like in the picture above.
+* each JPx must be bridged to the right (i.e. by shorting pads 2 and 3) for the
+  TS9347CP/2R00, symmetrical to the picture above.
+
+In addition, for the TS9347CP only, the RV1 potentiometer must be adjusted so
+that its middle pin gives `TODO` V.
+
+### Selecting the video RAM size
+
+Provided neither long codes nor custom fonts are used, the EF9345 and TS9347 can
+operate with as little as just 2 KiB of video RAM.
+
+While the AS6C62256-55PCN RAM IC contains 32 KiB of RAM, it is possible to mask
+some of its address lines through jumpers JP11-JP14 to make it appear smaller.
+The following configurations are possible:
+
+<table>
+  <tr>
+    <td align="center"><img width="60%" src="pictures/memory_2K.svg" /><br />2 K</td>
+    <td align="center"><img width="60%" src="pictures/memory_4K.svg" /><br />4 K</td>
+    <td align="center"><img width="60%" src="pictures/memory_8K.svg" /><br />8 K</td>
+    <td align="center"><img width="60%" src="pictures/memory_16K.svg" /><br />16 K</td>
+    <td align="center"><img width="60%" src="pictures/memory_32K.svg" /><br />32 K</td>
+  </tr>
+</table>
+
+Note 1: JP14 is ignored and can be left unpopulated in the case of the EF9345
+chip, as EF9345 only supports up to 16 KiB.
+
+Note 2: current and future tests will assume that all the jumpers are connected
+to the right (i.e. maximum possible RAM size).
+
+### Getting 5 V power from the EZ-USB FX2LP development board
+
+All the chips on our board (including, notably, the video chip) need to be
+powered at 5 V. The USB power supply provided from the host would be suitable
+(the USB bus provides power at exactly 5 V) but, unfortunately, no pin of the
+EZ-USB FX2LP development board exposes the USB's 5 V line.
+
+Therefore, in order to connect USB's 5 V to our board, we need to apply a small
+mod to the EZ-USB FX2LP board by soldering and connecting a wire as shown in the
+following images:
+
+<p align="center">
+<img src="pictures/mod_5V_bottom.svg" alt="Bottom side" width="40%" />
+<img src="pictures/mod_5V_top.svg" alt="Top side" width="40%" />
+</p>
+
+Note: by soldering the wire in the way shown above, the power switch on the
+front of the EZ-USB FX2LP board will be in control of our derived 5 V rail too.
+
+## Gallery
+
+<p>
+<img src="pictures/side_view.jpg" alt="A board seen from its left side" height="150" />
+<img src="pictures/everything.jpg" alt="Populated and unpopulated boards" height="150" />
+<img src="pictures/pcb.jpg" alt="The printed circuit" height="150" />
+</p>
