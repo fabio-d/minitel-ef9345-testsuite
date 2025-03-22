@@ -103,7 +103,8 @@ depending on the type of video chip to be tested:
   TS9347CP/2R00, symmetrical to the picture above.
 
 In addition, for the TS9347CP only, the RV1 potentiometer must be adjusted so
-that its middle pin gives `TODO` V.
+that its middle pin gives about 0.456 V (to tell the SYNC and BLACK levels
+apart, see the "REFERENCE LEVEL" table in the TS9347 datasheet).
 
 ### Selecting the video RAM size
 
