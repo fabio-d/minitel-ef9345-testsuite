@@ -5,35 +5,53 @@ import os
 import sys
 import traceback
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVarTuple
 
 from .video_chip import VideoChip
 
 _ALL_TESTS: List[_Test] = []
+
+_Parameters = TypeVarTuple("_Parameters")
 
 
 class _Test:
     def __init__(
         self,
         name: str,
-        function: Callable[[VideoChip], None],
+        function: Callable[[VideoChip, *_Parameters], None],
+        parameters: Tuple[*_Parameters] = (),
         restrict: Optional[VideoChip] = None,
     ):
         self.name = name
-        self.function = function
+        self.function = lambda video_chip: function(video_chip, *parameters)
         self.restrict = restrict
 
 
 # A function decorator for marking tests.
-def test(*, restrict: Optional[VideoChip] = None):
-    def decorator(function):
-        _ALL_TESTS.append(
-            _Test(
-                name=function.__name__,
-                function=function,
-                restrict=restrict,
+def test(
+    *,
+    parametric: Optional[Dict[str, Tuple[*_Parameters]]] = None,
+    restrict: Optional[VideoChip] = None,
+):
+    def decorator(function: Callable[[VideoChip, *_Parameters], Any]):
+        if parametric is None:
+            _ALL_TESTS.append(
+                _Test(
+                    name=function.__name__,
+                    function=function,
+                    restrict=restrict,
+                )
             )
-        )
+        else:
+            for case_name, parameters in parametric.items():
+                _ALL_TESTS.append(
+                    _Test(
+                        name=f"{function.__name__}/{case_name}",
+                        function=function,
+                        parameters=parameters,
+                        restrict=restrict,
+                    )
+                )
         return function
 
     return decorator

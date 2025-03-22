@@ -2,47 +2,19 @@ import time
 from testlib import *
 
 
-@test()
-def test_render_40columns_b0(video: VideoChip):
-    _test_render_40columns_inner(video, 0)
-
-
-@test()
-def test_render_40columns_b1(video: VideoChip):
-    _test_render_40columns_inner(video, 1)
-
-
-@test()
-def test_render_40columns_b2(video: VideoChip):
-    _test_render_40columns_inner(video, 2)
-
-
-@test()
-def test_render_40columns_b3(video: VideoChip):
-    _test_render_40columns_inner(video, 3)
-
-
-@test()
-def test_render_40columns_b4(video: VideoChip):
-    _test_render_40columns_inner(video, 4)
-
-
-@test()
-def test_render_40columns_b5(video: VideoChip):
-    _test_render_40columns_inner(video, 5)
-
-
-@test()
-def test_render_40columns_b6(video: VideoChip):
-    _test_render_40columns_inner(video, 6)
-
-
-@test()
-def test_render_40columns_b7(video: VideoChip):
-    _test_render_40columns_inner(video, 7)
-
-
-def _test_render_40columns_inner(video: VideoChip, b: int):
+@test(
+    parametric={
+        "b0": (0,),
+        "b1": (1,),
+        "b2": (2,),
+        "b3": (3,),
+        "b4": (4,),
+        "b5": (5,),
+        "b6": (6,),
+        "b7": (7,),
+    }
+)
+def test_render_40columns(video: VideoChip, b: int):
     # Set 40 columns long mode.
     match video.chip_type:
         case VideoChipType.EF9345:
