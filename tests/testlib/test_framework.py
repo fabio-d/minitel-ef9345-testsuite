@@ -65,11 +65,25 @@ def _host_and_port(text: str) -> Tuple[str, int]:
     return host, port
 
 
+def _generate_epilog() -> str:
+    lines = [
+        "The following tests are available:",
+        *(f"- {t.name}" for t in _ALL_TESTS),
+    ]
+    return "\n".join(lines)
+
+
 def test_main():
     # Parse command-line arguments.
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        epilog=_generate_epilog(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "--video-chip", metavar="HOST:PORT", required=True, type=_host_and_port
+    )
+    parser.add_argument(
+        "filter", nargs="*", choices=[t.name for t in _ALL_TESTS]
     )
     args = parser.parse_args()
 
@@ -85,6 +99,8 @@ def test_main():
     success_count = 0
     failed_count = 0
     for test in _ALL_TESTS:
+        if len(args.filter) != 0 and test.name not in args.filter:
+            continue
         if test.restrict and test.restrict != video_chip_type:
             continue
 
