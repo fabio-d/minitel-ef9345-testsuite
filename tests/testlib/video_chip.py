@@ -47,6 +47,7 @@ class VideoChip:
             socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP
         )
         self._sk.connect((host, port))
+        self._sk.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self._reader = self._sk.makefile("r")
         self._writer = self._sk.makefile("w")
 

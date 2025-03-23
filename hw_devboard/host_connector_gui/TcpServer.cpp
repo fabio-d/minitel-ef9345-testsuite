@@ -59,6 +59,8 @@ void TcpServer::onNewConnection() {
   while (QTcpSocket *client = m_server->nextPendingConnection()) {
     m_clients.insert(client);
 
+    client->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+
     connect(client, &QTcpSocket::readyRead, this,
             [this, client]() { onReadyRead(client); });
     connect(client, &QTcpSocket::readChannelFinished, this,
