@@ -4,6 +4,8 @@ import base64
 import enum
 import io
 import socket
+import time
+from typing import Tuple
 import PIL.Image
 
 
@@ -62,6 +64,19 @@ class VideoChip:
         self._writer.flush()
         data = base64.b64decode(self._reader.readline())
         return PIL.Image.open(io.BytesIO(data))
+
+    def flashing_rgb_screenshot(
+        self,
+    ) -> Tuple[PIL.Image.Image, PIL.Image.Image]:
+        first = self.rgb_screenshot()
+        for i in range(20):
+            time.sleep(0.1)
+            second = self.rgb_screenshot()
+            if first.tobytes() != second.tobytes():
+                break
+        if first.tobytes() > second.tobytes():
+            first, second = second, first  # make output order predictable
+        return first, second
 
     def read_register(self, regnum: int, execute: bool) -> int:
         assert regnum < 8
