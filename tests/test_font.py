@@ -41,9 +41,9 @@ def test_read_ind(video: VideoChip, b: int):
     image = PIL.Image.frombytes(
         "1", (32, len(bits) // 4), bytes(bits), "raw", "1;R"
     )
-    assert check_images_equal(
-        image,
+    assert_image(
         "test_font_data/test_read_ind_%s_b%d.png" % (video.chip_type.value, b),
+        image,
     )
 
 
@@ -151,10 +151,10 @@ def test_render_40columns(video: VideoChip, b: int):
     time.sleep(0.5)
 
     screenshot = video.rgb_screenshot()
-    assert check_images_equal(
-        screenshot,
+    assert_image(
         "test_font_data/test_render_40columns_%s_b%d.png"
         % (video.chip_type.value, b),
+        screenshot,
     )
 
 
@@ -220,9 +220,9 @@ def test_render_80columns(video: VideoChip):
     time.sleep(0.5)
 
     screenshot = video.rgb_screenshot()
-    assert check_images_equal(
-        screenshot,
+    assert_image(
         "test_font_data/test_render_80columns_%s.png" % video.chip_type.value,
+        screenshot,
     )
 
 

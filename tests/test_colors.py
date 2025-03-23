@@ -115,24 +115,13 @@ def test_40columns_attributes(video: VideoChip):
         time.sleep(0.5)
 
         if pat_extra & 0x40:
-            screenshot1, screenshot2 = video.flashing_rgb_screenshot()
-            assert check_images_equal(
-                screenshot1,
-                "test_colors_data/test_40columns_attributes_%02x-1.png"
-                % pat_extra,
-            )
-            assert check_images_equal(
-                screenshot2,
-                "test_colors_data/test_40columns_attributes_%02x-2.png"
-                % pat_extra,
-            )
+            screenshots = list(video.flashing_rgb_screenshot())
         else:
-            screenshot = video.rgb_screenshot()
-            assert check_images_equal(
-                screenshot,
-                "test_colors_data/test_40columns_attributes_%02x.png"
-                % pat_extra,
-            )
+            screenshots = [video.rgb_screenshot()]
+        assert_image(
+            "test_colors_data/test_40columns_attributes_%02x.png" % pat_extra,
+            *screenshots,
+        )
 
 
 if __name__ == "__main__":
