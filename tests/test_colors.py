@@ -81,8 +81,13 @@ ALL_MAT_CONFIGURATIONS = {  # mat_value => description
 }
 
 
-@test()
-def test_40columns_attributes(video: VideoChip):
+def test_40columns_attributes_generator(video: VideoChip):
+    for pat_extra, pat_descr in ALL_PAT_CONFIGURATIONS.items():
+        yield f"pat{pat_extra:02x}", pat_extra, pat_descr
+
+
+@test(parametric=test_40columns_attributes_generator)
+def test_40columns_attributes(video: VideoChip, pat_extra: int, pat_descr: str):
     # Set 40 columns long mode.
     match video.chip_type:
         case VideoChipType.EF9345:
@@ -96,7 +101,7 @@ def test_40columns_attributes(video: VideoChip):
     video.R1 = tgs_bgr
     video.ER0 = 0x81
     video.wait_not_busy()
-    video.R1 = pat_base
+    video.R1 = pat_base | pat_extra
     video.ER0 = 0x83
     video.wait_not_busy()
 
@@ -126,6 +131,16 @@ def test_40columns_attributes(video: VideoChip):
     video.ER0 = 0x91  # NOP to stop it.
     video.wait_not_busy()
 
+    # Draw header.
+    video.R0 = 0x01  # KRF/TLM with auto-increment.
+    video.R3 = 0x70  # white on black
+    video.R2 = 0x01  # insert
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    for c in pat_descr:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
     # Draw color stripes with varying attributes.
     match video.chip_type:
         case VideoChipType.EF9345:
@@ -148,42 +163,25 @@ def test_40columns_attributes(video: VideoChip):
             video.wait_not_busy()
         video.R3 = 0x70  # white on black
         video.R2 = 0x01  # insert
-        for c in f" {description:31s}"[:32]:
+        for c in f" {description}":
             video.ER1 = ord(c)
             video.wait_not_busy()
 
-    # Render with different PAT values.
-    for pat_extra, description in ALL_PAT_CONFIGURATIONS.items():
-        # Draw header.
-        video.R0 = 0x01  # KRF/TLM with auto-increment.
-        video.R3 = 0x70  # white on black
-        video.R2 = 0x01  # insert
-        video.R6 = 0  # y
-        video.R7 = 0  # x
-        for c in f"{description:40s}":
-            video.ER1 = ord(c)
-            video.wait_not_busy()
-
-        # Set PAT.
-        video.R1 = pat_base | pat_extra
-        video.ER0 = 0x83
+    reference = Screenshot.load(
+        "test_colors_data/test_40columns_attributes_%s_pat%02x.png"
+        % (video.chip_type.value, pat_extra)
+    )
+    if tgs_bgr == tgs_bir:
+        video.expect_screenshot(reference, ChannelSet.RGBI)
+    else:
+        video.R1 = tgs_bir
+        video.ER0 = 0x81
         video.wait_not_busy()
-
-        reference = Screenshot.load(
-            "test_colors_data/test_40columns_attributes_%s_pat%02x.png"
-            % (video.chip_type.value, pat_extra)
-        )
-        if tgs_bgr == tgs_bir:
-            video.expect_screenshot(reference, ChannelSet.RGBI)
-        else:
-            video.R1 = tgs_bir
-            video.ER0 = 0x81
-            video.wait_not_busy()
-            video.expect_screenshot(reference, ChannelSet.RBI)
-            video.R1 = tgs_bgr
-            video.ER0 = 0x81
-            video.wait_not_busy()
-            video.expect_screenshot(reference, ChannelSet.RGB)
+        video.expect_screenshot(reference, ChannelSet.RBI)
+        video.R1 = tgs_bgr
+        video.ER0 = 0x81
+        video.wait_not_busy()
+        video.expect_screenshot(reference, ChannelSet.RGB)
 
 
 if __name__ == "__main__":
