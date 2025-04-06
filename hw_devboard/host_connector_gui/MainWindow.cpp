@@ -19,7 +19,7 @@ MainWindow::MainWindow(UsbContext *usbContext, QWidget *parent)
     action->setActionGroup(paletteGroup);
     action->setCheckable(true);
   }
-  m_ui->actionViewPaletteRedGreenBlue->setChecked(true);
+  m_ui->actionViewPaletteRedGreenBlueInsert->setChecked(true);
 
   m_usbDevice = new UsbDeviceShim(this);
   m_synchonizer = new Synchronizer(this);
@@ -221,7 +221,10 @@ void MainWindow::processReceivedImage(QImage image) {
   QImage (ImageProcessor::*uncropped)() const;
   QImage (ImageProcessor::*cropped)() const;
 
-  if (m_ui->actionViewPaletteRedGreenBlue->isChecked()) {
+  if (m_ui->actionViewPaletteRedGreenBlueInsert->isChecked()) {
+    uncropped = &ImageProcessor::rgbInsertUncroppedImage;
+    cropped = &ImageProcessor::rgbInsertCroppedImage;
+  } else if (m_ui->actionViewPaletteRedGreenBlue->isChecked()) {
     uncropped = &ImageProcessor::rgbUncroppedImage;
     cropped = &ImageProcessor::rgbCroppedImage;
   } else if (m_ui->actionViewPaletteGrayscale->isChecked()) {

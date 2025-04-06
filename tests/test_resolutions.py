@@ -19,9 +19,7 @@ def test_40columns(video: VideoChip):
     video.ER0 = 0x83
     video.wait_not_busy()
 
-    time.sleep(0.5)
-
-    screenshot = video.rgb_screenshot()
+    screenshot = video.screenshot()
     assert screenshot.width == 2 + 40 * 8 + 2
     assert screenshot.height == 2 + 25 * 10 + 2
 
@@ -43,9 +41,7 @@ def test_80columns(video: VideoChip):
     video.ER0 = 0x83
     video.wait_not_busy()
 
-    time.sleep(0.5)
-
-    screenshot = video.rgb_screenshot()
+    screenshot = video.screenshot()
     assert screenshot.width == 2 + 80 * 6 + 2
     assert screenshot.height == 2 + 25 * 10 + 2
 
@@ -63,9 +59,7 @@ def test_40columns_525lines(video: VideoChip):
     video.ER0 = 0x83
     video.wait_not_busy()
 
-    time.sleep(0.5)
-
-    screenshot = video.rgb_screenshot()
+    screenshot = video.screenshot()
     assert screenshot.width == 2 + 40 * 8 + 2
     assert screenshot.height == 2 + 21 * 10 + 2
 
@@ -83,9 +77,7 @@ def test_80columns_525lines(video: VideoChip):
     video.ER0 = 0x83
     video.wait_not_busy()
 
-    time.sleep(0.5)
-
-    screenshot = video.rgb_screenshot()
+    screenshot = video.screenshot()
     assert screenshot.width == 2 + 80 * 6 + 2
     assert screenshot.height == 2 + 21 * 10 + 2
 

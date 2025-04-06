@@ -44,6 +44,10 @@ Install the prerequisites:
 $ sudo apt install build-essential mame python3-pil sdcc
 ```
 
+In alternative, build MAME from source. In this case, it is advised to apply the
+[mame.patch](mame.patch) from this directory, as some tests may not pass without
+it.
+
 Download the `charset.rom` file:
 
 ```

@@ -84,11 +84,28 @@ void TcpServer::onReadyRead(QTcpSocket *client) {
       } else {
         busError = true;
       }
-    } else if (line == "RGB?") {
-      QImage result = m_imgProc->rgbCroppedImage();
+    } else if (line == "SCREENSHOT?") {
+      QByteArray header;
+      if (m_imgProc->haveRed()) {
+        header.append('R');
+      }
+      if (m_imgProc->haveGreen()) {
+        header.append('G');
+      }
+      if (m_imgProc->haveBlue()) {
+        header.append('B');
+      }
+      if (m_imgProc->haveInsert()) {
+        header.append('I');
+      }
+
+      QImage image = m_imgProc->rgbInsertCroppedImage();
       QByteArray data;
       QBuffer buffer(&data);
-      result.save(&buffer, "PNG");
+      image.save(&buffer, "PNG");
+
+      client->write(header);
+      client->write("\n");
       client->write(data.toBase64());
       client->write("\n");
     } else if (QRegularExpressionMatch m = query_re.match(line); m.hasMatch()) {

@@ -48,10 +48,10 @@
      <property name="title">
       <string>&amp;Palette</string>
      </property>
+     <addaction name="actionViewPaletteRedGreenBlueInsert"/>
      <addaction name="actionViewPaletteRedGreenBlue"/>
      <addaction name="actionViewPaletteGrayscale"/>
      <addaction name="actionViewPaletteInsert"/>
-     <addaction name="separator"/>
     </widget>
     <addaction name="menuViewPalette"/>
     <addaction name="separator"/>
@@ -123,7 +123,7 @@
     <string>&amp;Grayscale</string>
    </property>
    <property name="shortcut">
-    <string>Alt+2</string>
+    <string>Alt+3</string>
    </property>
   </action>
   <action name="actionViewPaletteRedGreenBlue">
@@ -131,7 +131,7 @@
     <string>&amp;RGB</string>
    </property>
    <property name="shortcut">
-    <string>Alt+1</string>
+    <string>Alt+2</string>
    </property>
   </action>
   <action name="actionViewHideMenuBar">
@@ -147,7 +147,7 @@
     <string>&amp;Insert</string>
    </property>
    <property name="shortcut">
-    <string>Alt+3</string>
+    <string>Alt+4</string>
    </property>
   </action>
   <action name="actionPresetColorBands">
@@ -182,6 +182,14 @@
    </property>
    <property name="text">
     <string>&amp;Fullscreen</string>
+   </property>
+  </action>
+  <action name="actionViewPaletteRedGreenBlueInsert">
+   <property name="text">
+    <string>RGB+Insert</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+1</string>
    </property>
   </action>
  </widget>

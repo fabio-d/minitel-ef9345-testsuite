@@ -5,8 +5,11 @@ import enum
 import io
 import socket
 import time
-from typing import Tuple
 import PIL.Image
+
+from .channels import ChannelSet
+from .image_utils import test_images_equal, vertical_concat
+from .screenshot import Screenshot
 
 
 class VideoChipType(enum.Enum):
@@ -59,24 +62,95 @@ class VideoChip:
         self._writer.flush()
         return VideoChipType(self._reader.readline().strip())
 
-    def rgb_screenshot(self) -> PIL.Image.Image:
-        self._writer.write("RGB?\n")
-        self._writer.flush()
-        data = base64.b64decode(self._reader.readline())
-        return PIL.Image.open(io.BytesIO(data))
+    def expect_screenshot(self, reference: Screenshot, channels: ChannelSet):
+        matcher = reference.create_matcher(channels)
 
-    def flashing_rgb_screenshot(
-        self,
-    ) -> Tuple[PIL.Image.Image, PIL.Image.Image]:
-        first = self.rgb_screenshot()
-        for i in range(20):
-            time.sleep(0.1)
-            second = self.rgb_screenshot()
-            if first.tobytes() != second.tobytes():
-                break
-        if first.tobytes() > second.tobytes():
-            first, second = second, first  # make output order predictable
-        return first, second
+        prev_header_and_size = channels = None  # not known yet
+        unique_stream_images = []
+
+        for i in range(15):  # give up after 15 frames
+            if i != 0:
+                time.sleep(0.1)  # short delay
+            else:
+                time.sleep(0.5)  # longer delay before the initial frame
+
+            # Request a screenshot:
+            self._writer.write("SCREENSHOT?\n")
+            self._writer.flush()
+
+            # Read the header and the image payload.
+            header = self._reader.readline()
+            data = base64.b64decode(self._reader.readline())
+            image = PIL.Image.open(io.BytesIO(data))
+
+            # Ensure uniformity.
+            if prev_header_and_size is not None:
+                assert (header, image.size) == prev_header_and_size
+            else:
+                prev_header_and_size = (header, image.size)
+                channels = ChannelSet.NONE
+                if "R" in header:
+                    channels |= ChannelSet.R
+                if "G" in header:
+                    channels |= ChannelSet.G
+                if "B" in header:
+                    channels |= ChannelSet.B
+                if "I" in header:
+                    channels |= ChannelSet.I
+
+            # Store each unique frame we see in the stream.
+            if len(unique_stream_images) == 0 or not test_images_equal(
+                unique_stream_images[-1], image
+            ):
+                unique_stream_images.append(image)
+
+            if matcher.advance(image, channels):
+                return
+
+        vertical_concat(*unique_stream_images).show("actual_uniq")
+        vertical_concat(*reference.images).show("reference")
+        raise AssertionError("The screenshot did not match")
+
+    def screenshot(self, n_frames: int = 1):
+        assert n_frames >= 1
+
+        prev_header_and_size = None  # not known yet
+        images = []
+
+        for i in range(n_frames):
+            if i != 0:
+                time.sleep(0.1)  # short delay
+            else:
+                time.sleep(0.5)  # longer delay before the initial frame
+
+            # Request a screenshot:
+            self._writer.write("SCREENSHOT?\n")
+            self._writer.flush()
+
+            # Read the header and the image payload.
+            header = self._reader.readline()
+            data = base64.b64decode(self._reader.readline())
+            image = PIL.Image.open(io.BytesIO(data))
+
+            # Ensure uniformity.
+            if prev_header_and_size is not None:
+                assert (header, image.size) == prev_header_and_size
+            else:
+                prev_header_and_size = (header, image.size)
+
+            images.append(image)
+
+        # Pack into a Screenshot instance.
+        channels = ChannelSet.NONE
+        if "R" in header:
+            channels |= ChannelSet.R
+        if "G" in header:
+            channels |= ChannelSet.G
+        if "B" in header:
+            channels |= ChannelSet.B
+        if "I" in header:
+            channels |= ChannelSet.I
+        return Screenshot(images, channels)
 
     def read_register(self, regnum: int, execute: bool) -> int:
         assert regnum < 8

@@ -111,6 +111,7 @@ void ImageProcessor::setInputImage(QImage image,
   }
 }
 void ImageProcessor::updateColorTables() {
+  m_rgbInsertColorTable.clear();
   m_rgbColorTable.clear();
   m_grayscaleColorTable.clear();
   m_insertColorTable.clear();
@@ -122,6 +123,10 @@ void ImageProcessor::updateColorTables() {
     bool insert = (val & m_inputChannels.insert_mask) != 0;
 
     QRgb color = qRgb(red ? 255 : 0, green ? 255 : 0, blue ? 255 : 0);
+    QRgb colorNoInsert =
+        qRgb(red ? 0xCC : 0x44, green ? 0xCC : 0x44, blue ? 0xCC : 0x44);
+    m_rgbInsertColorTable.append(
+        (!insert && m_inputChannels.insert_mask != 0) ? colorNoInsert : color);
     m_rgbColorTable.append(color);
 
     uint8_t gs = rgb2grayscale(red, green, blue);
@@ -130,6 +135,30 @@ void ImageProcessor::updateColorTables() {
     uint8_t ins = insert ? 255 : 0;
     m_insertColorTable.append(qRgb(ins, ins, ins));
   }
+}
+
+bool ImageProcessor::haveRed() const {
+  return m_inputChannels.red_mask != 0;
+}
+
+bool ImageProcessor::haveGreen() const {
+  return m_inputChannels.green_mask != 0;
+}
+
+bool ImageProcessor::haveBlue() const {
+  return m_inputChannels.blue_mask != 0;
+}
+
+bool ImageProcessor::haveInsert() const {
+  return m_inputChannels.insert_mask != 0;
+}
+
+QImage ImageProcessor::rgbInsertUncroppedImage() const {
+  return applyPalette(m_inputImage, m_rgbInsertColorTable);
+}
+
+QImage ImageProcessor::rgbInsertCroppedImage() const {
+  return applyPalette(m_croppedInputImage, m_rgbInsertColorTable);
 }
 
 QImage ImageProcessor::rgbUncroppedImage() const {

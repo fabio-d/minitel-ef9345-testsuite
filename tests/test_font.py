@@ -38,13 +38,14 @@ def test_read_ind(video: VideoChip, b: int):
             video.wait_not_busy()
             bits.append(video.R1)
 
-    image = PIL.Image.frombytes(
+    reference = PIL.Image.open(
+        "test_font_data/test_read_ind_%s_b%d.png" % (video.chip_type.value, b),
+        formats=["png"],
+    ).convert("1")
+    actual = PIL.Image.frombytes(
         "1", (32, len(bits) // 4), bytes(bits), "raw", "1;R"
     )
-    assert_image(
-        "test_font_data/test_read_ind_%s_b%d.png" % (video.chip_type.value, b),
-        image,
-    )
+    assert test_images_equal(actual, reference)
 
 
 @test(
@@ -148,14 +149,14 @@ def test_render_40columns(video: VideoChip, b: int):
 
     video.R7 = 0  # move the cursor of of the way of the rendered font
 
-    time.sleep(0.5)
-
-    screenshot = video.rgb_screenshot()
-    assert_image(
+    reference = Screenshot.load(
         "test_font_data/test_render_40columns_%s_b%d.png"
-        % (video.chip_type.value, b),
-        screenshot,
+        % (
+            video.chip_type.value,
+            b,
+        )
     )
+    video.expect_screenshot(reference, ChannelSet.RGB)
 
 
 @test()
@@ -217,13 +218,10 @@ def test_render_80columns(video: VideoChip):
             video.ER1 = c
             video.wait_not_busy()
 
-    time.sleep(0.5)
-
-    screenshot = video.rgb_screenshot()
-    assert_image(
-        "test_font_data/test_render_80columns_%s.png" % video.chip_type.value,
-        screenshot,
+    reference = Screenshot.load(
+        "test_font_data/test_render_80columns_%s.png" % video.chip_type.value
     )
+    video.expect_screenshot(reference, ChannelSet.RGB)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,82 @@
+diff --git a/src/devices/video/ef9345.cpp b/src/devices/video/ef9345.cpp
+index 16436fe72f4..0cf06a831c2 100644
+--- a/src/devices/video/ef9345.cpp
++++ b/src/devices/video/ef9345.cpp
+@@ -217,24 +217,28 @@ void ef9345_device::set_busy_flag(int period)
+ void ef9345_device::draw_char_40(uint8_t *c, uint16_t x, uint16_t y)
+ {
+ 	const rgb_t *palette = m_palette->palette()->entry_list_raw();
++	int mask = m_palette->palette()->num_colors() - 1;
++
+ 	const int scan_xsize = std::min( screen().width() - (x * 8), 8);
+ 	const int scan_ysize = std::min( screen().height() - (y * 10), 10);
+ 
+ 	for(int i = 0; i < scan_ysize; i++)
+ 		for(int j = 0; j < scan_xsize; j++)
+-			m_screen_out.pix(y * 10 + i, x * 8 + j) = palette[c[8 * i + j] & 0x07];
++			m_screen_out.pix(y * 10 + i, x * 8 + j) = palette[c[8 * i + j] & mask];
+ }
+ 
+ // draw a char in 80 char line mode
+ void ef9345_device::draw_char_80(uint8_t *c, uint16_t x, uint16_t y)
+ {
+ 	const rgb_t *palette = m_palette->palette()->entry_list_raw();
++	int mask = m_palette->palette()->num_colors() - 1;
++
+ 	const int scan_xsize = std::min( screen().width() - (x * 6), 6);
+ 	const int scan_ysize = std::min( screen().height() - (y * 10), 10);
+ 
+ 	for(int i = 0; i < scan_ysize; i++)
+ 		for(int j = 0; j < scan_xsize; j++)
+-			m_screen_out.pix(y * 10 + i, x * 6 + j) = palette[c[6 * i + j] & 0x07];
++			m_screen_out.pix(y * 10 + i, x * 6 + j) = palette[c[6 * i + j] & mask];
+ }
+ 
+ 
+@@ -263,7 +267,7 @@ void ef9345_device::set_video_mode(void)
+ 	}
+ 
+ 	//border color
+-	memset(m_border, m_mat & 0x07, sizeof(m_border));
++	memset(m_border, m_mat & 0x0f, sizeof(m_border));
+ 
+ 	//set the base for the m_videoram charset
+ 	m_ram_base[0] = ((m_dor & 0x07) << 11);
+diff --git a/src/mame/philips/minitel_2_rpic.cpp b/src/mame/philips/minitel_2_rpic.cpp
+index a0f91b0c161..4366d42b854 100644
+--- a/src/mame/philips/minitel_2_rpic.cpp
++++ b/src/mame/philips/minitel_2_rpic.cpp
+@@ -170,14 +170,16 @@ private:
+ 
+ void minitel_state::machine_start()
+ {
+-	m_palette->set_pen_color(0, 0, 0, 0);
+-	m_palette->set_pen_color(1, 80, 80, 80);
+-	m_palette->set_pen_color(2, 160, 160, 160);
+-	m_palette->set_pen_color(3, 230, 230, 230);
+-	m_palette->set_pen_color(4, 40, 40, 40);
+-	m_palette->set_pen_color(5, 120, 120, 120);
+-	m_palette->set_pen_color(6, 200, 200, 200);
+-	m_palette->set_pen_color(7, 255, 255, 255);
++	for (pen_t insert : {0, 8}) {
++		m_palette->set_pen_color(insert + 0, 0, 0, 0);
++		m_palette->set_pen_color(insert + 1, 80, 80, 80);
++		m_palette->set_pen_color(insert + 2, 160, 160, 160);
++		m_palette->set_pen_color(insert + 3, 230, 230, 230);
++		m_palette->set_pen_color(insert + 4, 40, 40, 40);
++		m_palette->set_pen_color(insert + 5, 120, 120, 120);
++		m_palette->set_pen_color(insert + 6, 200, 200, 200);
++		m_palette->set_pen_color(insert + 7, 255, 255, 255);
++	}
+ }
+ 
+ void minitel_state::port1_w(uint8_t data)
+@@ -555,7 +557,7 @@ void minitel_state::minitel2(machine_config &config)
+ 	screen.set_size(512, 312);
+ 	screen.set_visarea(2, 512-10, 0, 278-1);
+ 
+-	PALETTE(config, m_palette).set_entries(8+1);
++	PALETTE(config, m_palette).set_entries(16);
+ 
+ 	// Send a fake 1300 Hz carrier (emulate the modem ZCO output)
+ 	auto &fake_1300hz_clock(CLOCK(config, "fake_1300hz_clock", 1300));

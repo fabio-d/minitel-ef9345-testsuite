@@ -136,24 +136,26 @@ class ScreenshotBroker:
 
     async def _conn_handler(self):
         while True:
-            frame_w, frame_h = struct.unpack(
-                "<HH", await self._screenshot_r.readexactly(4)
+            num_channels, frame_w, frame_h = struct.unpack(
+                "<BHH", await self._screenshot_r.readexactly(5)
             )
             frame_size = 4 * frame_w * frame_h
             frame_data = await self._screenshot_r.readexactly(frame_size)
-            self._latest_image = crop_minitel2_image(
+            header = {3: "RGB", 4: "RGBI"}[num_channels]
+            self._latest_image = header, crop_minitel2_image(
                 PIL.Image.frombytes(
                     "RGBA", (frame_w, frame_h), frame_data, "raw", "BGRA"
                 ).convert("RGB")
             )
 
-    def get_latest_image(self) -> bytes:
+    def get_latest_image(self) -> Tuple[str, bytes]:
         if self._latest_image is None:
-            return b""
+            return "", b""
 
+        header, image = self._latest_image
         buf = io.BytesIO()
-        self._latest_image.save(buf, format="png")
-        return buf.getvalue()
+        image.save(buf, format="png")
+        return header, buf.getvalue()
 
 
 class Server:
@@ -175,9 +177,10 @@ class Server:
             request_str = request_bytes.decode().strip()
             if request_str == "TYPE?":
                 response = b"TS9347\n"
-            elif request_str == "RGB?":
-                image_bytes = self._screenshot_broker.get_latest_image()
-                response = base64.b64encode(image_bytes) + b"\n"
+            elif request_str == "SCREENSHOT?":
+                header, image_bytes = self._screenshot_broker.get_latest_image()
+                response = header.encode() + b"\n"
+                response += base64.b64encode(image_bytes) + b"\n"
             elif query_match := QUERY_RE.fullmatch(request_str):
                 # Build and execute a read register request.
                 exec_bit, reg = query_match.groups()
