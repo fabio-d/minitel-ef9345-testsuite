@@ -2,14 +2,6 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>800</width>
-    <height>600</height>
-   </rect>
-  </property>
   <property name="contextMenuPolicy">
    <enum>Qt::ContextMenuPolicy::ActionsContextMenu</enum>
   </property>
@@ -19,13 +11,20 @@
   <property name="windowTitle">
    <string>USB Video Adapter</string>
   </property>
-  <widget class="DisplayWidget" name="displayWidget"/>
+  <widget class="DisplayWidget" name="displayWidget">
+   <property name="minimumSize">
+    <size>
+     <width>490</width>
+     <height>260</height>
+    </size>
+   </property>
+  </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>490</width>
      <height>30</height>
     </rect>
    </property>
@@ -90,9 +89,6 @@
   </action>
   <action name="actionViewScale">
    <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
     <bool>true</bool>
    </property>
    <property name="text">
