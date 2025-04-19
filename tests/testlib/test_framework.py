@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 import traceback
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import (
     Any,
@@ -150,7 +151,9 @@ def test_main():
     success_count = 0
     failed_count = 0
     for test in all_tests:
-        if len(args.filter) != 0 and test.name not in args.filter:
+        if len(args.filter) != 0 and not any(
+            fnmatchcase(test.name, pattern) for pattern in args.filter
+        ):
             continue
         if test.restrict and test.restrict != video_chip_type:
             continue
