@@ -75,8 +75,8 @@ ALL_COLOR_ATTRIBUTES_TS9347 = {  # (a, b) -> description
 ALL_MAT_CONFIGURATIONS = {  # mat_value => description
     0x00: "No cursor",
     0x40: "FixedComplemented",
-    0x50: "FlashComplemented",
-    0x60: "FixedUnderlined",
+    0x60: "FlashComplemented",
+    0x50: "FixedUnderlined",
     0x70: "FlashUnderline",
 }
 
@@ -170,6 +170,134 @@ def test_40columns_attributes(video: VideoChip, pat_extra: int, pat_descr: str):
     reference = Screenshot.load(
         "test_colors_data/test_40columns_attributes_%s_pat%02x.png"
         % (video.chip_type.value, pat_extra)
+    )
+    if tgs_bgr == tgs_bir:
+        video.expect_screenshot(reference, ChannelSet.RGBI)
+    else:
+        video.R1 = tgs_bir
+        video.ER0 = 0x81
+        video.wait_not_busy()
+        video.expect_screenshot(reference, ChannelSet.RBI)
+        video.R1 = tgs_bgr
+        video.ER0 = 0x81
+        video.wait_not_busy()
+        video.expect_screenshot(reference, ChannelSet.RGB)
+
+
+def test_40columns_cursor_generator(video: VideoChip):
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            all_color_attributes = ALL_COLOR_ATTRIBUTES_EF9345
+        case VideoChipType.TS9347:
+            all_color_attributes = ALL_COLOR_ATTRIBUTES_TS9347
+
+    for pat_extra, pat_descr in ALL_PAT_CONFIGURATIONS.items():
+        for mat_extra, mat_descr in ALL_MAT_CONFIGURATIONS.items():
+            if mat_extra == 0:
+                # skip the "no cursor" test case, because it's already covered
+                # by test_40columns_attributes.
+                continue
+
+            for (a, b), attr_descr in all_color_attributes.items():
+                yield f"pat{pat_extra:02x}mat{mat_extra:02x}a{a:02x}b{b:02x}", pat_extra, pat_descr, mat_extra, mat_descr, a, b, attr_descr
+
+
+@test(parametric=test_40columns_cursor_generator)
+def test_40columns_cursor(
+    video: VideoChip,
+    pat_extra: int,
+    pat_descr: str,
+    mat_extra: int,
+    mat_descr: str,
+    a: int,
+    b: int,
+    attr_descr: str,
+):
+    # Set 40 columns long mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            tgs_bgr = 0x10
+            tgs_bir = 0x10
+            pat_base = 0x07
+        case VideoChipType.TS9347:
+            tgs_bgr = 0x00
+            tgs_bir = 0x10
+            pat_base = 0x03
+    video.R1 = tgs_bgr
+    video.ER0 = 0x81
+    video.wait_not_busy()
+    video.R1 = pat_base | pat_extra
+    video.ER0 = 0x83
+    video.wait_not_busy()
+
+    # mat
+    video.R1 = 0x08 | mat_extra
+    video.ER0 = 0x82
+    video.wait_not_busy()
+
+    # ror
+    video.R1 = 0x08
+    video.ER0 = 0x87
+    video.wait_not_busy()
+
+    # dor
+    video.R1 = 0x00
+    video.ER0 = 0x84
+    video.wait_not_busy()
+
+    # Clear screen.
+    video.R1 = ord(" ")
+    video.R2 = 0x01  # insert bit set
+    video.R3 = 0x00
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x05  # CLF/CLL
+    time.sleep(0.5)
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Draw header.
+    video.R0 = 0x01  # KRF/TLM with auto-increment.
+    video.R3 = 0x70  # white on black
+    video.R2 = 0x01  # insert
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    for c in pat_descr:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Draw test pattern.
+    video.R0 = 0x01  # KRF/TLM with auto-increment.
+    video.R6 = 8  # y
+    video.R7 = 0  # x
+    for c in " EXAMPLE ":
+        video.R3 = a | 0x13  # red on yellow
+        video.R2 = b
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+    video.R3 = 0x70  # white on black
+    video.R2 = 0x01  # insert
+    for c in f" {attr_descr}":
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Draw cursor type description.
+    video.R0 = 0x01  # KRF/TLM with auto-increment.
+    video.R6 = 9  # y
+    video.R7 = 3  # x
+    video.R3 = 0x70  # white on black
+    video.R2 = 0x01  # insert
+    for c in f"\x5E {mat_descr}"[:31]:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Position the cursor on the "A" of "EXAMPLE".
+    video.R6 = 8  # y
+    video.R7 = 3  # x
+
+    reference = Screenshot.load(
+        "test_colors_data/test_40columns_cursor_%s_pat%02xmat%02xa%02xb%02x.png"
+        % (video.chip_type.value, pat_extra, mat_extra, a, b)
     )
     if tgs_bgr == tgs_bir:
         video.expect_screenshot(reference, ChannelSet.RGBI)
