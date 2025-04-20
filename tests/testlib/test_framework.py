@@ -166,6 +166,8 @@ def test_main():
         success = True
         try:
             test.function(video_chip)
+        except KeyboardInterrupt:
+            raise
         except:
             traceback.print_exc(file=sys.stderr)
             success = False
