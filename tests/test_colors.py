@@ -1,6 +1,4 @@
 import time
-from collections import defaultdict
-import PIL.Image
 from testlib import *
 
 # All the PAT bits that may affect how color and insert channels are rendered.

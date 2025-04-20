@@ -1,4 +1,3 @@
-import time
 from testlib import *
 
 
