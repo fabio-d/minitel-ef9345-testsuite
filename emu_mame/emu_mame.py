@@ -21,6 +21,7 @@ CHARSETFILE = "charset.rom"
 async def run_mame_minitel2(
     mame: str,
     charset_rom: str,
+    show_window: bool,
     serial_tcp_port: int,
     screenshot_tcp_port: int,
 ):
@@ -60,7 +61,7 @@ async def run_mame_minitel2(
             )
 
         try:
-            proc = await asyncio.create_subprocess_exec(
+            cmdline = [
                 mame,
                 "minitel2",
                 # Do not look for .ini files.
@@ -81,13 +82,6 @@ async def run_mame_minitel2(
                 # Load our XML configuration that sets periinfo at 14400 8N1.
                 "-cfg_directory",
                 cfgdir,
-                # Disable video output. As a side effect, this will skip the
-                # "bad ROM" warning prompt, which would otherwise require a user
-                # interaction.
-                "-videodriver",
-                "offscreen",
-                "-video",
-                "none",
                 # Disable audio output.
                 "-sound",
                 "none",
@@ -96,6 +90,21 @@ async def run_mame_minitel2(
                 os.path.abspath(
                     os.path.join(os.path.dirname(__file__), "helper.lua")
                 ),
+            ]
+            if show_window:
+                cmdline += ["-window"]
+            else:
+                cmdline += [
+                    # Disable video output. As a side effect, this will skip the
+                    # "bad ROM" warning prompt, which would otherwise require a
+                    # user interaction.
+                    "-videodriver",
+                    "offscreen",
+                    "-video",
+                    "none",
+                ]
+            proc = await asyncio.create_subprocess_exec(
+                *cmdline,
                 cwd=tmpdir,
                 env={
                     # Tell our lua helper script where to send the screenshots
@@ -239,6 +248,11 @@ async def main():
         required=True,
         help='Path to the "charset.rom" file',
     )
+    parser.add_argument(
+        "--show-window",
+        action="store_true",
+        help="Do not hide video output",
+    )
     args = parser.parse_args()
     listen_host, listen_port = args.listen
 
@@ -255,6 +269,7 @@ async def main():
         run_mame_minitel2(
             mame=args.mame,
             charset_rom=args.charset_rom,
+            show_window=args.show_window,
             serial_tcp_port=serial_serv.sockets[0].getsockname()[1],
             screenshot_tcp_port=screenshot_serv.sockets[0].getsockname()[1],
         )
