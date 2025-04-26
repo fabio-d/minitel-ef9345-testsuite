@@ -429,5 +429,126 @@ def test_80columns_attributes(video: VideoChip, pat_extra: int, pat_descr: str):
         video.expect_screenshot(reference, ChannelSet.RGB)
 
 
+def test_80columns_cursor_generator(video: VideoChip):
+    for pat_extra, pat_descr in ALL_PAT_CONFIGURATIONS_80COLUMNS.items():
+        for mat_extra, mat_descr in ALL_MAT_CONFIGURATIONS.items():
+            if mat_extra == 0:
+                # skip the "no cursor" test case, because it's already covered
+                # by test_80columns_attributes.
+                continue
+
+            for a, attr_descr in ALL_COLOR_ATTRIBUTES_80COLUMNS.items():
+                yield f"pat{pat_extra:02x}mat{mat_extra:02x}a{a:x}", pat_extra, pat_descr, mat_extra, mat_descr, a, attr_descr
+
+
+@test(parametric=test_80columns_cursor_generator)
+def test_80columns_cursor(
+    video: VideoChip,
+    pat_extra: int,
+    pat_descr: str,
+    mat_extra: int,
+    mat_descr: str,
+    a: int,
+    attr_descr: str,
+):
+    # Set 40 columns long mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            tgs_bgr = 0xD0
+            tgs_bir = 0xD0
+            pat_base = 0x07
+        case VideoChipType.TS9347:
+            tgs_bgr = 0xC0
+            tgs_bir = 0xD0
+            pat_base = 0x03
+    video.R1 = tgs_bgr
+    video.ER0 = 0x81
+    video.wait_not_busy()
+    video.R1 = pat_base | pat_extra
+    video.ER0 = 0x83
+    video.wait_not_busy()
+
+    # mat
+    video.R1 = 0x02 | mat_extra  # green
+    video.ER0 = 0x82
+    video.wait_not_busy()
+
+    # ror
+    video.R1 = 0x08
+    video.ER0 = 0x87
+    video.wait_not_busy()
+
+    # dor
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x94
+        case VideoChipType.TS9347:
+            # See corresponding note in test_80columns_attributes.
+            video.R1 = 0x14
+    video.ER0 = 0x84
+    video.wait_not_busy()
+
+    # Clear screen.
+    video.R1 = ord(" ")
+    video.R2 = ord(" ")
+    video.R3 = 0x00
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x05  # CLF/CLL
+    time.sleep(0.5)
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Draw header.
+    video.R0 = 0x51  # KRL with auto-increment.
+    video.R3 = 0x11  # c1
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    for c in pat_descr:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Draw test pattern.
+    video.R6 = 8  # y
+    video.R7 = 0  # x
+    video.R3 = a * 0x11
+    for c in " EXAMPLE ":
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+    video.R7 = 5  # x
+    video.R3 = 0x11  # c1
+    for c in attr_descr:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Draw cursor type description.
+    video.R6 = 9  # y
+    video.R7 = 0x81  # x
+    video.R3 = 0x11  # c1
+    for c in f"\x5E {mat_descr}"[:31]:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Position the cursor on the "A" of "EXAMPLE".
+    video.R6 = 8  # y
+    video.R7 = 0x81  # x
+
+    reference = Screenshot.load(
+        "test_colors_data/test_80columns_cursor_pat%02xmat%02xa%x.png"
+        % (pat_extra, mat_extra, a)
+    )
+    if tgs_bgr == tgs_bir:
+        video.expect_screenshot(reference, ChannelSet.RGBI)
+    else:
+        video.R1 = tgs_bir
+        video.ER0 = 0x81
+        video.wait_not_busy()
+        video.expect_screenshot(reference, ChannelSet.RBI)
+        video.R1 = tgs_bgr
+        video.ER0 = 0x81
+        video.wait_not_busy()
+        video.expect_screenshot(reference, ChannelSet.RGB)
+
+
 if __name__ == "__main__":
     test_main()
