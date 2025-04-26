@@ -124,7 +124,7 @@ def crop_minitel2_image(img: PIL.Image.Image) -> PIL.Image.Image:
             )
         case (490, 278):
             return img.crop(
-                (5 - MARGIN, 10 - MARGIN, 485 + MARGIN, 260 + MARGIN)
+                (4 - MARGIN, 10 - MARGIN, 484 + MARGIN, 260 + MARGIN)
             )
 
 
