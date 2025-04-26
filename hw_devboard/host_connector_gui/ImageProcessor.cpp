@@ -66,7 +66,7 @@ static QImage applyPalette(QImage image, QList<QRgb> palette) {
 ImageProcessor::ImageProcessor(QObject *parent) : QObject(parent) {
 }
 
-void ImageProcessor::setInputImage(QImage image,
+void ImageProcessor::setInputImage(QImage image, VideoChipType videoChipType,
                                    VideoChipChannelMapping channels,
                                    VideoChipMode mode) {
   const uint8_t dataMask = channels.red_mask | channels.green_mask |
@@ -84,7 +84,7 @@ void ImageProcessor::setInputImage(QImage image,
     cropArea.setWidth(320 + 4);
     break;
   case 768:
-    cropArea.setLeft(192 - 2);
+    cropArea.setLeft((videoChipType == VideoChipType::TS9347 ? 191 : 192) - 2);
     cropArea.setWidth(480 + 4);
     break;
   }

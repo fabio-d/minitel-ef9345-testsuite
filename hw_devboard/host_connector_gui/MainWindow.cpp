@@ -84,7 +84,8 @@ void MainWindow::isConnectedChanged() {
   bool isConnected = m_usbDevice->isConnected();
 
   m_synchonizer->reset();
-  m_imageProcessor->setInputImage(QImage(), VideoChipChannelMapping{},
+  m_imageProcessor->setInputImage(QImage(), VideoChipType::EF9345,
+                                  VideoChipChannelMapping{},
                                   VIDEO_MODE_40_COLUMNS); // clear
 
   m_ui->actionDeviceConnect->setEnabled(!isConnected);
@@ -215,7 +216,8 @@ void MainWindow::applyFullscreen() {
 }
 
 void MainWindow::processReceivedImage(QImage image) {
-  m_imageProcessor->setInputImage(image, *m_usbDevice->videoChipChannels(),
+  m_imageProcessor->setInputImage(image, *m_usbDevice->videoChipType(),
+                                  *m_usbDevice->videoChipChannels(),
                                   *m_usbDevice->videoChipMode());
 
   QImage (ImageProcessor::*uncropped)() const;

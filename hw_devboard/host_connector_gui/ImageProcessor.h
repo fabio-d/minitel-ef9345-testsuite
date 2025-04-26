@@ -12,8 +12,8 @@ class ImageProcessor : public QObject {
 public:
   explicit ImageProcessor(QObject *parent = nullptr);
 
-  void setInputImage(QImage image, VideoChipChannelMapping channels,
-                     VideoChipMode mode);
+  void setInputImage(QImage image, VideoChipType videoChipType,
+                     VideoChipChannelMapping channels, VideoChipMode mode);
 
   bool haveRed() const;
   bool haveGreen() const;
