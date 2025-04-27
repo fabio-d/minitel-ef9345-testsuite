@@ -2,6 +2,117 @@ import time
 from testlib import *
 
 
+@test()
+def test_double_size_render(video: VideoChip):
+    # Set 40 columns long mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            tgs = 0x10
+            pat = 0x37
+        case VideoChipType.TS9347:
+            tgs = 0x00
+            pat = 0x33
+    video.R1 = tgs
+    video.ER0 = 0x81
+    video.wait_not_busy()
+    video.R1 = pat
+    video.ER0 = 0x83
+    video.wait_not_busy()
+
+    # mat
+    video.R1 = 0x08
+    video.ER0 = 0x82
+    video.wait_not_busy()
+
+    # ror
+    video.R1 = 0x08
+    video.ER0 = 0x87
+    video.wait_not_busy()
+
+    # dor
+    video.R1 = 0x00
+    video.ER0 = 0x84
+    video.wait_not_busy()
+
+    # Clear screen.
+    video.R1 = 0x00
+    video.R2 = 0x00
+    video.R3 = 0x00
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x05  # CLF/CLL
+    time.sleep(0.5)
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Draw four characters with easily recognizable patterns in all possible
+    # sizes.
+    TEXT = r"/ \ < >"
+    video.R0 = 0x01  # KRF/TLM with auto-increment.
+    video.R3 = 0x07  # black on white
+
+    # Row 8: regular size.
+    video.R2 = 0x00
+    video.R6 = 8  # y
+    video.R7 = 0  # x
+    for c in TEXT:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Row 10: double width.
+    video.R2 = 0x08
+    video.R6 = 10  # y
+    video.R7 = 0  # x
+    for c in TEXT:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Row 12 and 13: double height.
+    video.R2 = 0x02
+    video.R6 = 12  # y
+    video.R7 = 0  # x
+    for c in TEXT:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+    video.R6 = 13  # y
+    video.R7 = 0  # x
+    for c in TEXT:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    # Row 15 and 16: double width and height.
+    video.R2 = 0x0A
+    video.R6 = 15  # y
+    video.R7 = 0  # x
+    for c in TEXT:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+    video.R6 = 16  # y
+    video.R7 = 0  # x
+    for c in TEXT:
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+        video.ER1 = ord(c)
+        video.wait_not_busy()
+
+    reference = Screenshot.load("test_size_data/test_double_size_render.png")
+    video.expect_screenshot(reference, ChannelSet.RGB)
+
+    # mat
+    video.R1 = 0x88  # set global double height bit too
+    video.ER0 = 0x82
+    video.wait_not_busy()
+
+    reference = Screenshot.load(
+        "test_size_data/test_double_size_render_globally_doubled.png"
+    )
+    video.expect_screenshot(reference, ChannelSet.RGB)
+
+
 def test_double_size_and_cursor_generator(video: VideoChip):
     for globally_doubled in [False, True]:
         for mat_extra, descr in [(0x00, "complemented"), (0x10, "underline")]:
