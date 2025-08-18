@@ -147,7 +147,7 @@ def test_render_40columns(video: VideoChip, b: int):
             video.wait_not_busy()
         video.R6 += 1  # y
 
-    video.R7 = 0  # move the cursor of of the way of the rendered font
+    video.R7 = 0  # move the cursor out of the way of the rendered font
 
     reference = Screenshot.load(
         "test_font_data/test_render_40columns_%s_b%d.png"
