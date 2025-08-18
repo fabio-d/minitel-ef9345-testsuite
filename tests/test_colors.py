@@ -407,6 +407,7 @@ def test_80columns_attributes(video: VideoChip, pat_extra: int, pat_descr: str):
         video.R7 = 0x80  # column 1
         video.R3 = a
         video.ER1 = ord("@")
+        video.wait_not_busy()
         video.R7 = 0x81  # column 3
         video.R3 = 0x11  # c1
         for c in description:
