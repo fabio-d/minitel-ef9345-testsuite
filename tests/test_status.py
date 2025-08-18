@@ -14,11 +14,12 @@ def test_not_busy(video: VideoChip):
     video.ER0 = 0x83
     video.wait_not_busy()
 
-    start = time.monotonic_ns()
     video.ER0 = 0x91  # NOP
+    video.wait_not_busy()
 
     # Check the BUSY flag as often as possible. Given that no command is
     # pending, it should stay to zero all the time.
+    start = time.monotonic_ns()
     while time.monotonic_ns() - start < 500000000:  # 500 ms
         assert (video.R0 & 0x80) == 0
 
