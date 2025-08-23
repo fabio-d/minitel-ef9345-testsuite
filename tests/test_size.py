@@ -208,6 +208,85 @@ def test_double_size_and_cursor(
     video.expect_screenshot(reference, ChannelSet.RGB)
 
 
+def test_double_size_in_service_row_generator(video: VideoChip):
+    yield "top", False
+    if video.chip_type == VideoChipType.TS9347:
+        yield "bottom", True
+
+
+@test(parametric=test_double_size_in_service_row_generator)
+def test_double_size_in_service_row(video: VideoChip, low_service_row: bool):
+    # Set 40 columns long mode. On the TS9347, position the service row
+    # according to the test parameter.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            tgs = 0x10
+            pat = 0x37
+        case VideoChipType.TS9347:
+            tgs = 0x01 if low_service_row else 0x00  # = bottom if set
+            pat = 0x33
+    video.R1 = tgs
+    video.ER0 = 0x81
+    video.wait_not_busy()
+    video.R1 = pat
+    video.ER0 = 0x83
+    video.wait_not_busy()
+
+    # MAT
+    video.R1 = 0x08
+    video.ER0 = 0x82
+    video.wait_not_busy()
+
+    # ROR
+    video.R1 = 0x08
+    video.ER0 = 0x87
+    video.wait_not_busy()
+
+    # DOR
+    video.R1 = 0x00
+    video.ER0 = 0x84
+    video.wait_not_busy()
+
+    # Clear screen.
+    video.R1 = 0x00
+    video.R2 = 0x00
+    video.R3 = 0x00
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x05  # CLF/CLL
+    time.sleep(0.5)
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    video.R0 = 0x01  # KRF/TLM with auto-increment.
+    video.R3 = 0x70  # white on black
+    video.R1 = ord("X")
+
+    for y in [0, 8, 9]:
+        video.R6 = y
+        video.R7 = 0  # x
+
+        # Draw with regular size.
+        video.ER2 = 0
+
+        # Draw with double width.
+        video.ER2 = 0x08
+        video.ER2 = 0x08
+
+        # Draw with double height.
+        video.ER2 = 0x02
+
+        # Draw with double width and height.
+        video.ER2 = 0x0A
+        video.ER2 = 0x0A
+
+    reference = Screenshot.load(
+        "test_size_data/test_double_size_in_service_row_%s.png"
+        % ("bottom" if low_service_row else "top")
+    )
+    video.expect_screenshot(reference, ChannelSet.RGB)
+
+
 def test_nonuniform_double_size_generator(video: VideoChip):
     CASES = [
         # All normal sizes.
