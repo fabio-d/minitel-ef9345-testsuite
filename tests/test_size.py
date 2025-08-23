@@ -268,17 +268,23 @@ def test_double_size_in_service_row(video: VideoChip, low_service_row: bool):
 
         # Draw with regular size.
         video.ER2 = 0
+        video.wait_not_busy()
 
         # Draw with double width.
         video.ER2 = 0x08
+        video.wait_not_busy()
         video.ER2 = 0x08
+        video.wait_not_busy()
 
         # Draw with double height.
         video.ER2 = 0x02
+        video.wait_not_busy()
 
         # Draw with double width and height.
         video.ER2 = 0x0A
+        video.wait_not_busy()
         video.ER2 = 0x0A
+        video.wait_not_busy()
 
     reference = Screenshot.load(
         "test_size_data/test_double_size_in_service_row_%s.png"
@@ -385,6 +391,7 @@ def test_nonuniform_double_size(
         video.R7 = 2  # x
         for x in range(4):
             letter = chr(ord("A") + y * 4 + x)
+
             # Set double width and height attributes.
             attr_b = 0
             if letter in double_width_letters:
@@ -398,7 +405,9 @@ def test_nonuniform_double_size(
             fgcolor = (x + 3 * y) % 7 + 1
             bgcolor = fgcolor ^ 0x7
             video.R3 = (fgcolor << 4) | bgcolor
+
             video.ER1 = ord(letter)
+            video.wait_not_busy()
 
     reference = Screenshot.load(
         "test_size_data/test_nonuniform_double_size_%s.png" % ref_name
