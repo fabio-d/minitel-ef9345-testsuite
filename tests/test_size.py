@@ -208,5 +208,124 @@ def test_double_size_and_cursor(
     video.expect_screenshot(reference, ChannelSet.RGB)
 
 
+def test_nonuniform_double_size_generator(video: VideoChip):
+    CASES = [
+        # All normal sizes.
+        ("", ""),
+        # Double width, double height and both at top-left corner.
+        ("AB", ""),
+        ("", "AE"),
+        ("ABEF", "ABEF"),
+        # Double width, double height and both after a double width column.
+        ("AEIMBC", ""),
+        ("AEIM", "BF"),
+        ("AEIMBCFG", "BCFG"),
+        # Double width, double height and both after a double height row.
+        ("EF", "ABCD"),
+        ("", "ABCDEI"),
+        ("EFIJ", "ABCDEFIJ"),
+        # Double width, double height and both after double width+height row/column.
+        ("ABCDEIMFG", "ABCDEIM"),
+        ("ABCDEIM", "ABCDEIMFK"),
+        ("ABCDEIMFGKL", "ABCDEIMFGKL"),
+        # Lone double-sized characters.
+        ("F", ""),
+        ("", "F"),
+        ("F", "F"),
+    ]
+    for dw_list, dh_list in CASES:
+        ref_name = "dw%s_dh%s" % (
+            dw_list if dw_list else "NONE",
+            dh_list if dh_list else "NONE",
+        )
+        yield ref_name, dw_list, dh_list, ref_name
+
+
+# According to the datasheet, double-sized rendering requires all the characters
+# at the occupied positions to be the same (e.g. "AA" in case of double width).
+# This test validates the undocumented behavior in case those characters differ,
+# both in the characters and in their colors.
+@test(parametric=test_nonuniform_double_size_generator)
+def test_nonuniform_double_size(
+    video: VideoChip,
+    double_width_letters: str,
+    double_height_letters: str,
+    ref_name: str,
+):
+    # Set 40 columns long mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            tgs = 0x10
+            pat = 0x37
+        case VideoChipType.TS9347:
+            tgs = 0x00
+            pat = 0x33
+    video.R1 = tgs
+    video.ER0 = 0x81
+    video.wait_not_busy()
+    video.R1 = pat
+    video.ER0 = 0x83
+    video.wait_not_busy()
+
+    # MAT
+    video.R1 = 0x08
+    video.ER0 = 0x82
+    video.wait_not_busy()
+
+    # ROR
+    video.R1 = 0x08
+    video.ER0 = 0x87
+    video.wait_not_busy()
+
+    # DOR
+    video.R1 = 0x00
+    video.ER0 = 0x84
+    video.wait_not_busy()
+
+    # Clear screen.
+    video.R1 = 0x00
+    video.R2 = 0x00
+    video.R3 = 0x00
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x05  # CLF/CLL
+    time.sleep(0.5)
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Draw a 4x4 matrix with consecutive letters:
+    #  ABCD
+    #  EFGH
+    #  JKLM
+    #  NOPQ
+    # For each position set the double-width and double-height attributes
+    # are set only on some letters, depending on the current test parameters.
+    video.R0 = 0x01  # KRF/TLM with auto-increment.
+    for y in range(4):
+        video.R6 = 10 + y
+        video.R7 = 2  # x
+        for x in range(4):
+            letter = chr(ord("A") + y * 4 + x)
+            # Set double width and height attributes.
+            attr_b = 0
+            if letter in double_width_letters:
+                attr_b |= 0x08
+            if letter in double_height_letters:
+                attr_b |= 0x02
+            video.R2 = attr_b
+
+            # Set colors so that the character grid is clearly visible.
+            # This also verifies that size attributes don't influence colors.
+            fgcolor = (x + 3 * y) % 7 + 1
+            bgcolor = fgcolor ^ 0x7
+            video.R3 = (fgcolor << 4) | bgcolor
+            video.ER1 = ord(letter)
+
+    reference = Screenshot.load(
+        "test_size_data/test_nonuniform_double_size_%s.png" % ref_name
+    )
+    video.expect_screenshot(reference, ChannelSet.RGB)
+
+
 if __name__ == "__main__":
     test_main()
