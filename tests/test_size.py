@@ -415,5 +415,82 @@ def test_nonuniform_double_size(
     video.expect_screenshot(reference, ChannelSet.RGB)
 
 
+# This test further validates the rendering of a single character with the
+# double-width attribute, followed by a blank space (optionally underlined).
+@test(
+    parametric={
+        "b0": (0, ord("X"), False),  # just an X.
+        "b1": (1, ord("X"), False),  # underlined X.
+        "b3": (2, 0x59, False),  # a mosaic character.
+        "b0u": (0, ord("X"), True),  # just an X.
+        "b1u": (1, ord("X"), True),  # underlined X.
+        "b3u": (2, 0x59, True),  # a mosaic character.
+    }
+)
+def test_lone_double_width(
+    video: VideoChip, b: int, c: int, underline_follows: bool
+):
+    # Set 40 columns long mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            tgs = 0x10
+            pat = 0x37
+        case VideoChipType.TS9347:
+            tgs = 0x00
+            pat = 0x33
+    video.R1 = tgs
+    video.ER0 = 0x81
+    video.wait_not_busy()
+    video.R1 = pat
+    video.ER0 = 0x83
+    video.wait_not_busy()
+
+    # MAT
+    video.R1 = 0x08
+    video.ER0 = 0x82
+    video.wait_not_busy()
+
+    # ROR
+    video.R1 = 0x08
+    video.ER0 = 0x87
+    video.wait_not_busy()
+
+    # DOR
+    video.R1 = 0x00
+    video.ER0 = 0x84
+    video.wait_not_busy()
+
+    # Clear screen.
+    video.R1 = ord(" ")
+    video.R2 = 0x00
+    video.R3 = 0x70  # white on black
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x05  # CLF/CLL
+    time.sleep(0.5)
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Draw it.
+    video.R1 = c
+    video.R2 = (b << 4) | 0x08  # double-width
+    video.R3 = 0x70  # white on black
+    video.R6 = 0x08  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x01  # KRF/TLM with auto-increment.
+    video.wait_not_busy()
+
+    if underline_follows:
+        video.R1 = ord(" ")
+        video.ER2 = 0x10  # underlined
+        video.wait_not_busy()
+
+    reference = Screenshot.load(
+        "test_size_data/test_lone_double_width_b%d%s.png"
+        % (b, "u" if underline_follows else "")
+    )
+    video.expect_screenshot(reference, ChannelSet.RGB)
+
+
 if __name__ == "__main__":
     test_main()
