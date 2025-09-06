@@ -1,4 +1,5 @@
 *-backups/
 *.kicad_pcb.lck
+*.kicad_prl
 *.kicad_sch.lck
 fp-info-cache
