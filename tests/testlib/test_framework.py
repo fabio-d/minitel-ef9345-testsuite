@@ -18,7 +18,7 @@ from typing import (
     Union,
 )
 
-from .video_chip import VideoChip
+from .video_chip import VideoChip, VideoChipType
 
 _ALL_TESTS: List[_Test] = []
 
@@ -31,7 +31,7 @@ class _Test:
         name: str,
         function: Callable[[VideoChip, *_Parameters], None],
         parameters: Tuple[*_Parameters] = (),
-        restrict: Optional[VideoChip] = None,
+        restrict: Optional[VideoChipType] = None,
     ):
         self.name = name
         self.function = lambda video_chip: function(video_chip, *parameters)
@@ -44,7 +44,7 @@ class _TestWithLazyParameters:
         name: str,
         function: Callable[[VideoChip, *_Parameters], None],
         param_generator: Callable[[VideoChip], Iterator[Tuple[*_Parameters]]],
-        restrict: Optional[VideoChip] = None,
+        restrict: Optional[VideoChipType] = None,
     ):
         self.name = name
         self.function = function
@@ -60,7 +60,7 @@ def test(
         Dict[str, Tuple[*_Parameters]],
         None,
     ] = None,
-    restrict: Optional[VideoChip] = None,
+    restrict: Optional[VideoChipType] = None,
 ):
     def decorator(function: Callable[[VideoChip, *_Parameters], Any]):
         if parametric is None:
