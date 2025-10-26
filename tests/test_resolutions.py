@@ -155,6 +155,33 @@ def test_areas_40columns(video: VideoChip):
             video.ER1 = ord(c)
             video.wait_not_busy()
 
+    # Draw a double-height unique character at each boundary crossing, on a
+    # "background" of normal-sized Xs (to detect unwanted attribute "leakage").
+    for y in [0, 8, 19, 20, 31]:
+        video.R6 = y
+        video.R1 = ord('X')
+        for x in range(34, 39):
+            video.ER7 = x
+            video.wait_not_busy()
+    video.R0 = 0x00  # KRF/TLM without auto-increment.
+    video.R2 = 0x02  # double heigth
+    video.R7 = 35  # x
+    video.R1 = ord("A")
+    video.ER6 = 0  # y
+    video.wait_not_busy()
+    video.ER6 = 8  # y
+    video.wait_not_busy()
+    video.R7 = 36  # x
+    video.R1 = ord("B")
+    video.ER6 = 19  # y
+    video.wait_not_busy()
+    video.ER6 = 20  # y
+    video.wait_not_busy()
+    video.R7 = 37  # x
+    video.R1 = ord("C")
+    video.ER6 = 31  # y
+    video.wait_not_busy()
+
     for ref_name, pat_extra, tgs_extra, mat_extra in test_areas_generator(
         video.chip_type
     ):
