@@ -607,6 +607,62 @@ def test_memory_write_ap_read_mp(video: VideoChip):
         assert video.R1 == i ^ 0x55
 
 
+def test_memory_access_wrapping_generator(video: VideoChip):
+    for z in range(video.vram_size_kb):
+        match video.chip_type:
+            case VideoChipType.EF9345:
+                yield f"KRF_z{z}", 0x00, True, z
+                yield f"KRG_z{z}", 0x02, False, z
+            case VideoChipType.TS9347:
+                yield f"TLM_z{z}", 0x00, True, z
+                yield f"TLA_z{z}", 0x22, True, z
+                yield f"TSM_z{z}", 0x60, False, z
+                yield f"TSA_z{z}", 0x70, False, z
+                yield f"KRG_z{z}", 0x02, False, z  # undocumented
+
+
+# Tests the behavior of multi-byte memory operations crossing a district
+# boundary.
+@test(parametric=test_memory_access_wrapping_generator)
+def test_memory_access_wrapping(video: VideoChip, cmd: int, long: bool, z: int):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Write an initial value into each of them using a single-byte command.
+    video.R0 = 0x30  # OCT/TBM
+    expected_contents = []
+    for i, (_, _, r6, r7) in enumerate(generate_block_pointers(video)):
+        video.R1 = i
+        expected_contents.append(i)
+        video.R6 = r6
+        video.ER7 = r7
+        video.wait_not_busy()
+
+    # Set different values at block z (and onwards) with a multi-byte command.
+    video.R4, video.R5, video.R6, video.R7 = generate_block_pointers(video)[z]
+    z_plus_offset = lambda idx: (z & ~3) | ((z + idx) % 4)
+    expected_contents[z_plus_offset(0)] = video.R1 = 0xA1
+    expected_contents[z_plus_offset(1)] = video.R2 = 0xA2
+    if long:
+        expected_contents[z_plus_offset(2)] = video.R3 = 0xA3
+    video.ER0 = cmd
+    video.wait_not_busy()
+
+    # Verify each memory locations via single-byte commands.
+    video.R0 = 0x38  # OCT/TBM + read
+    for i, (_, _, r6, r7) in enumerate(generate_block_pointers(video)):
+        video.R6 = r6
+        video.ER7 = r7
+        video.wait_not_busy()
+        assert video.R1 == expected_contents[i]
+
+
 # Tests that changes to ROR take effect at the beginning of the next rendered
 # row.
 @test()
