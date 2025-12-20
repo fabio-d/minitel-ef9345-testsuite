@@ -3,6 +3,7 @@ import time
 import PIL.Image
 from pathlib import Path
 from testlib import *
+from typing import List, Tuple
 
 
 @test(parametric={"b%dy%d" % (b, y): (b, y) for b in [0, 1] for y in range(32)})
@@ -506,6 +507,104 @@ def test_memory_access_incr(video: VideoChip, cmd: int, type: str, ap: bool):
         assert video.R7 == 0  # x (MP)
         assert video.R4 == 0  # y (AP)
         assert video.R5 == 0  # x (AP)
+
+
+# Generate the list of MP and AP values pointing to the beginning of each block.
+def generate_block_pointers(
+    video: VideoChip,
+) -> List[Tuple[int, int, int, int]]:
+    pointers = []
+    for z in range(video.vram_size_kb):
+        b = z & 3
+        d = z >> 2
+        match video.chip_type:
+            case VideoChipType.EF9345:
+                # MP
+                r6 = ((d & 2) << 6) | ((d & 1) << 5)
+
+                # AP
+                r6 |= (d & 2) << 5
+                r4 = (d & 1) << 5
+            case VideoChipType.TS9347:
+                r4 = r6 = d << 5
+        r7 = r5 = ((b & 2) << 5) | ((b & 1) << 7)
+        pointers.append((r4, r5, r6, r7))
+    return pointers
+
+
+@test()
+def test_memory_write_mp_read_ap(video: VideoChip):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Write a different value into each block.
+    for i, (r4, r5, r6, r7) in enumerate(generate_block_pointers(video)):
+        video.R4 = r4
+        video.R5 = r5
+        video.R6 = r6
+        video.R7 = r7
+
+        # Write zero via the AP to force a known value.
+        video.R0 = 0x34  # OCT/TBA
+        video.ER1 = 0x00
+        video.wait_not_busy()
+
+        # Write the final value via the MP.
+        video.R0 = 0x30  # OCT/TBM
+        video.ER1 = i ^ 0x55
+        video.wait_not_busy()
+
+    # Verify by reading them back via the AP.
+    video.R0 = 0x3C  # OCT/TBA + read
+    for i, (r4, r5, r6, _) in enumerate(generate_block_pointers(video)):
+        video.R4 = r4
+        video.R5 = r5
+        video.ER6 = r6
+        video.wait_not_busy()
+        assert video.R1 == i ^ 0x55
+
+
+@test()
+def test_memory_write_ap_read_mp(video: VideoChip):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Write a different value into each block.
+    for i, (r4, r5, r6, r7) in enumerate(generate_block_pointers(video)):
+        video.R4 = r4
+        video.R5 = r5
+        video.R6 = r6
+        video.R7 = r7
+
+        # Write zero via the MP to force a known value.
+        video.R0 = 0x30  # OCT/TBM
+        video.ER1 = 0x00
+        video.wait_not_busy()
+
+        # Write the final value via the AP.
+        video.R0 = 0x34  # OCT/TBA
+        video.ER1 = i ^ 0x55
+        video.wait_not_busy()
+
+    # Verify by reading them back via the MP.
+    video.R0 = 0x38  # OCT/TBM + read
+    for i, (_, _, r6, r7) in enumerate(generate_block_pointers(video)):
+        video.R6 = r6
+        video.ER7 = r7
+        video.wait_not_busy()
+        assert video.R1 == i ^ 0x55
 
 
 # Tests that changes to ROR take effect at the beginning of the next rendered

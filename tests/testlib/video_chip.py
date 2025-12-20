@@ -62,6 +62,15 @@ class VideoChip:
         self._writer.flush()
         return VideoChipType(self._reader.readline().strip())
 
+    @property
+    def vram_size_kb(self) -> int:
+        # Assume that the maximum amount of video RAM is connected.
+        match self.chip_type:
+            case VideoChipType.EF9345:
+                return 16
+            case VideoChipType.TS9347:
+                return 32
+
     def expect_screenshot(self, reference: Screenshot, channels: ChannelSet):
         matcher = reference.create_matcher(channels)
 
