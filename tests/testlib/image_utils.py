@@ -2,7 +2,7 @@ import PIL.Image
 
 
 def test_images_equal(a: PIL.Image.Image, b: PIL.Image.Image) -> bool:
-    assert a.format == b.format
+    assert a.mode == b.mode
     assert a.size == b.size
     return list(a.getdata()) == list(b.getdata())
 

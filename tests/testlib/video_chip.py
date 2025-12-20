@@ -111,17 +111,18 @@ class VideoChip:
         vertical_concat(*reference.images).show("reference")
         raise AssertionError("The screenshot did not match")
 
-    def screenshot(self, n_frames: int = 1):
+    def screenshot(self, n_frames: int = 1, /, skip_delay: bool = False):
         assert n_frames >= 1
 
         prev_header_and_size = None  # not known yet
         images = []
 
         for i in range(n_frames):
-            if i != 0:
-                time.sleep(0.1)  # short delay
-            else:
-                time.sleep(0.5)  # longer delay before the initial frame
+            if not skip_delay:
+                if i != 0:
+                    time.sleep(0.1)  # short delay
+                else:
+                    time.sleep(0.5)  # longer delay before the initial frame
 
             # Request a screenshot:
             self._writer.write("SCREENSHOT?\n")

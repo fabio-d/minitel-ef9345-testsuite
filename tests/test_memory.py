@@ -1,4 +1,6 @@
+import random
 import time
+import PIL.Image
 from pathlib import Path
 from testlib import *
 
@@ -504,6 +506,96 @@ def test_memory_access_incr(video: VideoChip, cmd: int, type: str, ap: bool):
         assert video.R7 == 0  # x (MP)
         assert video.R4 == 0  # y (AP)
         assert video.R5 == 0  # x (AP)
+
+
+# Tests that changes to ROR take effect at the beginning of the next rendered
+# row.
+@test()
+def test_screen_swap_origin(video: VideoChip):
+    # Load templates.
+    templ_a = PIL.Image.open("test_memory_data/test_screen_swap_origin_A.png")
+    templ_b = PIL.Image.open("test_memory_data/test_screen_swap_origin_B.png")
+
+    # Set 40 columns short mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            tgs = 0x10
+            pat = 0xB7
+        case VideoChipType.TS9347:
+            tgs = 0x40
+            pat = 0x33
+    video.R1 = tgs
+    video.ER0 = 0x81
+    video.wait_not_busy()
+    video.R1 = pat
+    video.ER0 = 0x83
+    video.wait_not_busy()
+
+    # MAT
+    video.R1 = 0x08
+    video.ER0 = 0x82
+    video.wait_not_busy()
+
+    # ROR
+    video.R1 = 0x08
+    video.ER0 = 0x87
+    video.wait_not_busy()
+
+    # DOR
+    video.R1 = 0x00
+    video.ER0 = 0x84
+    video.wait_not_busy()
+
+    # Fill screen at blocks 0-1 with white-on-black "A" characters.
+    video.R1 = 0x07
+    video.R2 = ord("A")
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x07  # CLG/CLS
+    time.sleep(0.1)
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Fill screen at blocks 2-3 with black-on-white "B" characters.
+    video.R1 = 0x47
+    video.R2 = ord("B")
+    video.R6 = 0  # y
+    video.R7 = 0x40  # x
+    video.ER0 = 0x07  # CLG/CLS
+    time.sleep(0.1)
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Repeatedly flip between the two pages, taking screenshots at semirandom
+    # intervals. Verify that at least one of them contains some rows showing all
+    # "A" and the remaining rows showing all "B", proving that ROR is latched at
+    # the beginning of each row (rather the beginning of the screen, or no
+    # latching at all).
+    mixed_screenshot_found = False
+    sample_at_indices = random.sample(range(2000), k=25)
+    for i, ror in enumerate([0x08, 0x48] * 1000):
+        video.R1 = ror
+        video.ER0 = 0x87
+        video.wait_not_busy()
+
+        if i in sample_at_indices:
+            # Grab a screenshot and convert it to black and white.
+            screenshot = video.screenshot(skip_delay=True).images[0]
+
+            # Count how many rows match templates A and B.
+            templ_a_count = 0
+            templ_b_count = 0
+            for y in range(2, 2 + 10 * 25, 10):  # every text row
+                row = screenshot.crop((2, y, 2 + 40 * 8, y + 10))
+                if test_images_equal(row, templ_a):
+                    templ_a_count += 1
+                elif test_images_equal(row, templ_b):
+                    templ_b_count += 1
+            assert templ_a_count + templ_b_count == 25  # all rows must match
+
+            if templ_a_count > 0 and templ_b_count > 0:
+                mixed_screenshot_found = True
+    assert mixed_screenshot_found
 
 
 if __name__ == "__main__":
