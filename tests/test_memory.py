@@ -473,40 +473,43 @@ def test_memory_access_incr(video: VideoChip, cmd: int, type: str, ap: bool):
     video.R5 = 0  # x (AP)
 
     # Unlike other commands, 80-column command interleave blocks 0 and 1.
-    expected_x_sequence = []
-    for i in range(40):
-        expected_x_sequence.append(i)  # block 0
-        if type in ("8", "12"):
-            expected_x_sequence.append(i | 0x80)  # block 1
+    x_sequence = []  # (initial, incremented)
+    for i in range(64):
+        # X only wraps to zero in these cases.
+        next_i = (i + 1) if i not in [39, 47, 55, 63] else 0
 
-    for expected_x in expected_x_sequence:
-        if ap:
-            assert video.R6 == 0  # y (MP)
-            assert video.R7 == 0  # x (MP)
-            assert video.R4 == 0  # y (AP)
-            assert video.R5 == expected_x  # x (AP)
+        if type in ("8", "12"):
+            x_sequence.append((i, i | 0x80))  # block 0 -> block 1
+            x_sequence.append((i | 0x80, next_i))  # block 1 -> block 0
         else:
-            assert video.R6 == 0  # y (MP)
-            assert video.R7 == expected_x  # x (MP)
-            assert video.R4 == 0  # y (AP)
-            assert video.R5 == 0  # x (AP)
+            x_sequence.append((i, next_i))
+
+    for init_x, incremented_x in x_sequence:
+        if ap:
+            video.R5 = init_x  # x (AP)
+        else:
+            video.R7 = init_x  # x (MP)
 
         # Run the command.
         video.ER0 = cmd | 0x09  # set read and auto-increment flag
         video.wait_not_busy()
 
-    # After the last incrementation, we are now back at column 0.
-    # The "Direct byte access" command, via MP only, also increments Y.
-    if ap:
-        assert video.R6 == 0  # y (MP)
-        assert video.R7 == 0  # x (MP)
-        assert video.R4 == 0  # y (AP)
-        assert video.R5 == 0  # x (AP)
-    else:
-        assert video.R6 == (1 if type == "B" else 0)  # y (MP)
-        assert video.R7 == 0  # x (MP)
-        assert video.R4 == 0  # y (AP)
-        assert video.R5 == 0  # x (AP)
+        if ap:
+            assert video.R6 == 0  # y (MP)
+            assert video.R7 == 0  # x (MP)
+            assert video.R4 == 0  # y (AP)
+            assert video.R5 == incremented_x  # x (AP)
+        else:
+            # The "Direct byte access" command, via MP only, also increments Y
+            # when X wraps to zero.
+            incremented_y = 1 if type == "B" and incremented_x == 0 else 0
+            assert video.R6 == incremented_y  # y (MP)
+            assert video.R7 == incremented_x  # x (MP)
+            assert video.R4 == 0  # y (AP)
+            assert video.R5 == 0  # x (AP)
+
+            # Cleanup Y for the next iteration.
+            video.R6 = 0  # y (MP)
 
 
 # Generate the list of MP and AP values pointing to the beginning of each block.
