@@ -456,7 +456,7 @@ def test_memory_access_read(video: VideoChip, cmd: int, type: str, ap: bool):
 
 
 @test(parametric=test_memory_access_generator)
-def test_memory_access_incr(video: VideoChip, cmd: int, type: str, ap: bool):
+def test_memory_access_incr_x(video: VideoChip, cmd: int, type: str, ap: bool):
     # Set TGS to ensure the chip is in a valid video mode.
     match video.chip_type:
         case VideoChipType.EF9345:
@@ -510,6 +510,41 @@ def test_memory_access_incr(video: VideoChip, cmd: int, type: str, ap: bool):
 
             # Cleanup Y for the next iteration.
             video.R6 = 0  # y (MP)
+
+    # The final part of this test validates the Y incrementation. Therefore, it
+    # only applies to "Direct byte access" command via MP (see comment above).
+    if type != "B" or ap:
+        return
+
+    # Validate that Y is incremented by 1, except in the case of wrapping from
+    # 31 to 8.
+    for i in range(32):
+        video.R6 = i  # y (MP)
+        video.ER7 = 39  # x (MP), at the end of the row
+        video.wait_not_busy()
+        assert video.R6 == (i + 1) if i != 31 else 8
+
+
+# Test INY and its aliases.
+@test(parametric={f"INY{cmd:02x}": (cmd,) for cmd in range(0xB0, 0xB0 + 16)})
+def test_memory_access_incr_y(video: VideoChip, cmd: int):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    video.R0 = cmd  # INY
+
+    # Validate that INY increments by 1, except in the case of wrapping from 31
+    # to 8.
+    for i in range(32):
+        video.ER6 = i
+        video.wait_not_busy()
+        assert video.R6 == (i + 1) if i != 31 else 8
 
 
 # Generate the list of MP and AP values pointing to the beginning of each block.
