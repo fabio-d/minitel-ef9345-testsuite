@@ -756,5 +756,56 @@ def test_screen_swap_origin(video: VideoChip):
     assert mixed_screenshot_found
 
 
+@test()
+def test_read_exec(video: VideoChip):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Write 0x11 and 0x22 in adjacent locations.
+    video.R0 = 0x31  # OCT/TBM with auto-increment
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER1 = 0x11
+    video.wait_not_busy()
+    video.ER1 = 0x22
+    video.wait_not_busy()
+    assert video.R7 == 2  # x
+
+    # Prepare to read back the 0x11.
+    video.R0 = 0x39  # OCT/TBM (read) with auto-increment
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+
+    # Perform a series of reads with the execution request bit set (i.e. from
+    # video.ERn rather than just video.Rn). Verify that we read the value from
+    # *before* the execution started.
+    readback_x = video.ER7  # R7=0 -> R1=0x11 R7=1
+    assert readback_x == 0
+    video.wait_not_busy()
+    readback_val = video.ER1  # R1=0x11 R7=1 -> R1=0x22 R7=2
+    assert readback_val == 0x11
+    video.wait_not_busy()
+    readback_val = video.ER1  # R1=0x22 R7=2 -> R7=3
+    assert readback_val == 0x22
+    video.wait_not_busy()
+    assert video.R7 == 3  # x
+
+    # Similarly, the busy bit should read as "not busy" (i.e. the state before
+    # the execution). Here we test it with "Clear Page", a command that never
+    # completes, to avoid race conditions.
+    video.R0 = 0x07  # CLG/CLS
+    assert (video.ER0 & 0x80) == 0
+
+    # Stop the clear operation, to leave the chip ready for the next test.
+    video.ER0 = 0x91  # NOP
+    video.wait_not_busy()
+
+
 if __name__ == "__main__":
     test_main()
