@@ -25,6 +25,10 @@ _ALL_TESTS: List[_Test] = []
 _Parameters = TypeVarTuple("_Parameters")
 
 
+class SkippedTestException(Exception):
+    pass
+
+
 class _Test:
     def __init__(
         self,
@@ -166,6 +170,10 @@ def test_main():
         success = True
         try:
             test.function(video_chip)
+        except SkippedTestException as e:
+            print(e, file=sys.stderr)
+            print("SKIP : %s" % test.name, file=sys.stderr)
+            continue
         except KeyboardInterrupt:
             raise
         except:

@@ -622,6 +622,47 @@ def test_memory_access_wrapping(video: VideoChip, cmd: int, long: bool, z: int):
         assert video.R1 == expected_contents[i]
 
 
+# This test verifies that, when multi-byte writes end up aliasing each other due
+# to unconnected address lines, the last one wins. This can only be tested with
+# 1 KiB or 2 KiB of VRAM (with more VRAM the accesses always land on distinct
+# locations and aliasing never occurs).
+@test()
+def test_write_aliasing(video: VideoChip):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Write a known pattern.
+    video.R6 = 0  # y
+    video.R7 = 0  # x, block
+    video.R1 = 0x11
+    video.R2 = 0x22
+    video.R3 = 0x33
+    video.ER0 = 0x00  # KRF/TLM
+    video.wait_not_busy()
+
+    # Read back the result.
+    video.ER0 = 0x08  # KRF/TLM + read
+    video.wait_not_busy()
+
+    match video.vram_size_kb:
+        case 1:
+            assert video.R1 == 0x33  # aliased
+            assert video.R2 == 0x33  # aliased
+            assert video.R3 == 0x33
+        case 2:
+            assert video.R1 == 0x33  # aliased
+            assert video.R2 == 0x22
+            assert video.R3 == 0x33
+        case _:
+            raise SkippedTestException("Device has more than 2 KiB of VRAM")
+
+
 # Tests that changes to ROR take effect at the beginning of the next rendered
 # row.
 @test()
