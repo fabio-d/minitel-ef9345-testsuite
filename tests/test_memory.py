@@ -566,6 +566,50 @@ def test_memory_write_ap_read_mp(video: VideoChip):
         assert video.R1 == i ^ 0x55
 
 
+# Tests that the unused pointer bits in EF9345 take no part in the address
+# decoding. The TS9347 has no unused bits in pointers.
+@test(
+    parametric={f"{bit}": (1 << bit,) for bit in [6, 7]},
+    restrict=VideoChipType.EF9345,
+)
+def test_unused_pointer_bits(video: VideoChip, r4_extra_bits: int):
+    # Set TGS to ensure the chip is in a valid video mode.
+    video.R1 = 0x10
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Write a marker at (0, 0) via MP and a different marker at (0, 1) via AP.
+    video.R4 = 0  # AP y
+    video.R5 = 1  # AP x
+    video.R6 = 0  # MP y
+    video.R7 = 0  # MP x
+    video.R0 = 0x30  # OCT via MP
+    video.ER1 = 0x11
+    video.R0 = 0x34  # OCT via AP
+    video.ER1 = 0x12
+    video.wait_not_busy()
+
+    # Clobber the unused bits in R4 and write a different value.
+    video.R4 = r4_extra_bits  # AP y
+    video.R5 = 1  # AP x
+    video.R6 = 0  # MP y
+    video.R7 = 0  # MP x
+    video.R0 = 0x30  # OCT via MP
+    video.ER1 = 0x21
+    video.R0 = 0x34  # OCT via AP
+    video.ER1 = 0x22
+    video.wait_not_busy()
+
+    # Read back (without extra bits) and verify.
+    video.R4 = 0
+    video.ER0 = 0x38  # OCT + read via MP
+    video.wait_not_busy()
+    assert video.R1 == 0x21
+    video.ER0 = 0x3C  # OCT + read via AP
+    video.wait_not_busy()
+    assert video.R1 == 0x22
+
+
 def test_memory_access_wrapping_generator(video: VideoChip):
     for z in range(video.vram_size_kb):
         match video.chip_type:
