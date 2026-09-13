@@ -83,22 +83,27 @@ CLEAR_PAGE_PARAMETERS = {
 }
 
 
-def test_clear_page16_generator(video: VideoChip):
+def test_clear_page_generator(video: VideoChip):
     match video.chip_type:
         case VideoChipType.EF9345:
-            commands = [0x07]
+            commands16 = [0x07]  # CLG
+            commands24 = [0x05]  # CLF
         case VideoChipType.TS9347:
             # On the TS9347, test the two undocumented aliases of CLS too.
-            commands = [0x07, 0x65, 0x67]
+            commands16 = [0x07, 0x65, 0x67]
+            commands24 = [0x05]  # CLL
     for name, args in CLEAR_PAGE_PARAMETERS.items():
-        for cmd in commands:
-            yield f"{name}/{cmd:02x}", cmd, *args
+        for cmd in commands16:
+            yield f"16/{name}/{cmd:02x}", cmd, False, *args
+        for cmd in commands24:
+            yield f"24/{name}/{cmd:02x}", cmd, True, *args
 
 
-@test(parametric=test_clear_page16_generator)
-def test_clear_page16(
+@test(parametric=test_clear_page_generator)
+def test_clear_page(
     video: VideoChip,
     cmd: int,
+    width24: bool,  # are we testing a 16-bit (False) or 24-bit (True) clear?
     clear_start_x: int,
     clear_start_y: int,
     expected_cleared_start_y: int,
@@ -144,12 +149,13 @@ def test_clear_page16(
         video.wait_not_busy()
 
     # Begin clearing with different known values, staring with the cursor at the
-    # given position. Note: only the first two blocks will be affected.
+    # given position.
     video.R1 = 1
     video.R2 = 2
+    video.R3 = 3  # only meaningful in the 24-bit test
     video.R6 = clear_start_y
     video.R7 = clear_start_x
-    video.ER0 = cmd  # CLG/CLS
+    video.ER0 = cmd
     assert video.R0 & 0x80  # busy flag is set
     time.sleep(0.1)  # leave the command running for a while
     assert video.R0 & 0x80  # busy flag is still set
@@ -173,99 +179,14 @@ def test_clear_page16(
         else:
             assert video.R1 == (0 << 6) | y
             assert video.R2 == (1 << 6) | y
-        # Verify that the last two blocks have *not* been affected.
+        # Verify the last two blocks too.
         video.ER7 = 0x40  # x=0, block=2
         video.wait_not_busy()
-        assert video.R1 == (2 << 6) | y
-        assert video.R2 == (3 << 6) | y
-
-
-@test(parametric=CLEAR_PAGE_PARAMETERS)
-def test_clear_page24(
-    video: VideoChip,
-    clear_start_x: int,
-    clear_start_y: int,
-    expected_cleared_start_y: int,
-):
-    # TGS
-    video.R1 = 0xD0
-    video.ER0 = 0x81
-    video.wait_not_busy()
-
-    # PAT
-    video.R1 = 0x00
-    video.ER0 = 0x83
-    video.wait_not_busy()
-
-    # ROR
-    video.R1 = 0x08
-    video.ER0 = 0x87
-    video.wait_not_busy()
-
-    # DOR
-    video.R1 = 0x00
-    video.ER0 = 0x84
-    video.wait_not_busy()
-
-    # Write a known value at the first column of each row in district 0.
-    # This will touch three out of the four blocks in district 0.
-    video.R0 = 0x00  # KRF/TLM
-    video.R7 = 0  # x
-    for y in ALL_ROWS:
-        video.R1 = (1 << 6) | y
-        video.R2 = (2 << 6) | y
-        video.R3 = (3 << 6) | y
-        video.ER6 = y  # y
-        video.wait_not_busy()
-
-    # For the remaining block of district 0, write a canary value in each row.
-    video.R0 = 0x30  # OCT/TBM
-    video.R7 = 0 | (3 << 6)  # x, block=3
-    for y in ALL_FULL_ROWS:
-        video.R1 = y ^ 0xFF
-        video.ER6 = y  # y
-        video.wait_not_busy()
-
-    # Begin clearing with different known values, staring with the cursor at the
-    # given position.
-    video.R1 = 1
-    video.R2 = 2
-    video.R3 = 3
-    video.R6 = clear_start_y
-    video.R7 = clear_start_x
-    video.ER0 = 0x05  # CLF/CLL
-    assert video.R0 & 0x80  # busy flag is set
-    time.sleep(0.1)  # leave the command running for a while
-    assert video.R0 & 0x80  # busy flag is still set
-    video.ER0 = 0x91  # NOP to stop it.
-    video.wait_not_busy()
-
-    # While the command was running, the Y pointer (R6) will have wrapped many
-    # times from 31 to 8.
-    assert 8 <= video.R6 <= 31
-
-    # Read the first columns back, verifying that all of them have been cleared.
-    video.R0 = 0x08  # KRF/TLM + read
-    video.R7 = 0  # x
-    for y in ALL_ROWS:
-        video.ER6 = y  # y
-        video.wait_not_busy()
-        if y >= expected_cleared_start_y:
-            assert video.R1 == 1, (y, video.R1, video.R2, video.R3)
-            assert video.R2 == 2, (y, video.R1, video.R2, video.R3)
-            assert video.R3 == 3, (y, video.R1, video.R2, video.R3)
+        if width24 and y >= expected_cleared_start_y:
+            assert video.R1 == 3  # verify that it was modified
         else:
-            assert video.R1 == (1 << 6) | y
-            assert video.R2 == (2 << 6) | y
-            assert video.R3 == (3 << 6) | y
-
-    # Verify that the canary values were not affected.
-    video.R0 = 0x38  # OCT/TBM + read
-    video.R7 = 0 | (3 << 6)  # x, block=3
-    for y in ALL_FULL_ROWS:
-        video.ER6 = y  # y
-        video.wait_not_busy()
-        assert video.R1 == y ^ 0xFF
+            assert video.R1 == (2 << 6) | y  # verify it was not affected
+        assert video.R2 == (3 << 6) | y  # never affected
 
 
 # Command types:
