@@ -1,3 +1,4 @@
+import itertools
 import random
 import time
 import PIL.Image
@@ -187,6 +188,250 @@ def test_clear_page(
         else:
             assert video.R1 == (2 << 6) | y  # verify it was not affected
         assert video.R2 == (3 << 6) | y  # never affected
+
+
+def test_memory_move_stop_generator(video: VideoChip):
+    yield "MVB/MPtoAPa01", 0xD5, 1, True
+    yield "MVB/MPtoAPa00", 0xD4, 1, True  # undocumented alias
+    yield "MVB/APtoMPa01", 0xD9, 1, False
+    yield "MVB/APtoMPa00", 0xD8, 1, False  # undocumented alias
+    yield "MVD/MPtoAPa01", 0xE5, 2, True
+    yield "MVD/MPtoAPa00", 0xE4, 2, True  # undocumented alias
+    yield "MVD/APtoMPa01", 0xE9, 2, False
+    yield "MVD/APtoMPa00", 0xE8, 2, False  # undocumented alias
+    yield "MVT/MPtoAPa01", 0xF5, 3, True
+    yield "MVT/MPtoAPa00", 0xF4, 3, True  # undocumented alias
+    yield "MVT/APtoMPa01", 0xF9, 3, False
+    yield "MVT/APtoMPa00", 0xF8, 3, False  # undocumented alias
+
+
+@test(parametric=test_memory_move_stop_generator)
+def test_memory_move_stop(
+    video: VideoChip,
+    cmd: int,
+    num_blocks: int,
+    mp_to_ap: bool,
+):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Initially set the whole page to zero.
+    video.R1 = 0x00
+    video.R2 = 0x00
+    video.R3 = 0x00
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x05  # CLF/CLL
+    time.sleep(0.1)  # leave the command running for a while
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Fill row 8 with consective values (even on the blocks that should not be
+    # read by the move operation under test).
+    video.R6 = 8  # y
+    video.R7 = 0  # x
+    video.R0 = 0x01  # KRF/TLM with auto-increment
+    for i in range(40):
+        video.R1 = (1 << 6) | i
+        video.R2 = (2 << 6) | i
+        video.ER3 = (3 << 6) | i
+        video.wait_not_busy()
+
+    if mp_to_ap:
+        # Make MP point to (row 8, column 0) and AP to (row 9, column 1).
+        video.R4 = 9  # AP y
+        video.R5 = 1  # AP x
+        video.R6 = 8  # MP y
+        video.R7 = 0  # MP x
+        video.ER0 = cmd
+        video.wait_not_busy()
+
+        # Verify that the operation stopped after 39 columns.
+        assert video.R4 == 9
+        assert video.R5 == 0  # wrapped
+        assert video.R6 == 8
+        assert video.R7 == 39
+    else:
+        # Same as above, but with roles reversed.
+        video.R4 = 8  # AP y
+        video.R5 = 0  # AP x
+        video.R6 = 9  # MP y
+        video.R7 = 1  # MP x
+        video.ER0 = cmd
+        video.wait_not_busy()
+
+        # Verify that the operation stopped after 39 columns.
+        assert video.R4 == 8
+        assert video.R5 == 39  # wrapped
+        assert video.R6 == 9
+        assert video.R7 == 0
+
+    # The working register should have been left with the last transferred
+    # value.
+    assert video.R1 == (num_blocks << 6) | 38
+
+    # Verify the copied values.
+    video.R6 = 9  # y
+    video.R0 = 0x08  # KRF/TLM + read
+    for x in range(40):
+        video.ER7 = x  # x
+        video.wait_not_busy()
+        values = [video.R1, video.R2, video.R3]
+        for b in range(num_blocks):
+            if x == 0:
+                assert values[b] == 0  # first column should be unaffected
+            else:
+                assert values[b] == ((b + 1) << 6) | (x - 1)
+
+
+def test_memory_move_nonstop_generator(video: VideoChip):
+    yield "MVBa10", 0xD2, 1
+    yield "MVBa11", 0xD3, 1  # undocumented alias
+    yield "MVDa10", 0xE2, 2
+    yield "MVDa11", 0xE3, 2  # undocumented alias
+    yield "MVTa10", 0xF2, 3
+    yield "MVTa11", 0xF3, 3  # undocumented alias
+
+
+@test(parametric=test_memory_move_nonstop_generator)
+def test_memory_move_nonstop_mp_to_ap(
+    video: VideoChip,
+    cmd: int,
+    num_blocks: int,
+):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Fill row 0 with zeros.
+    video.R0 = 0x00  # KRF/TLM
+    video.R1 = 0x00
+    video.R2 = 0x00
+    video.R3 = 0x00
+    video.R6 = 0  # y
+    for x in range(40):
+        video.ER7 = x
+        video.wait_not_busy()
+
+    # Fill each row, starting from row 8 with its row number XOR'd with the
+    # column number and the block number.
+    video.R0 = 0x01  # KRF/TLM with auto-increment
+    for y in range(8, 32):
+        video.R6 = y
+        video.R7 = 0
+        for x in range(40):
+            video.R1 = y ^ x ^ 1
+            video.R2 = y ^ x ^ 2
+            video.ER3 = y ^ x ^ 3
+            video.wait_not_busy()
+
+    # Start a non-stop move from MP (8, 0) to AP (0, 0). It will repeatedly
+    # overwrite row 0 with a different source row. When interrupted, at some
+    # unspecified step, row 0 will contain partial data from a given source row
+    # and partial data from the previous source row.
+    video.R4 = 0  # AP y
+    video.R5 = 0  # AP x
+    video.R6 = 8  # MP y
+    video.R7 = 0  # MP x
+    video.ER0 = cmd | 0b0100  # MP to AP
+    time.sleep(0.1)  # leave the command running for a while
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Read the resulting buffer, removing the XOR'd column number and block
+    # number. The values are stored flattened in a single list.
+    video.R6 = 0  # y
+    video.R0 = 0x08  # KRF/TLM + read
+    values = []
+    for x in range(40):
+        video.ER7 = x  # x
+        video.wait_not_busy()
+        values.append(video.R1 ^ x ^ 1)
+        if num_blocks >= 2:
+            values.append(video.R2 ^ x ^ 2)
+        if num_blocks >= 3:
+            values.append(video.R3 ^ x ^ 3)
+
+    # Verify that either we interrupted at a an exact row boundary or we stopped
+    # with a partial row [A, A, A, ..., B, B, B] (where A and B are consecutive
+    # row numbers).
+    groups = tuple(k for k, _ in itertools.groupby(values))
+    assert len(groups) in [1, 2]
+    if len(groups) != 1:
+        assert groups == (8, 31) or (groups[0] == groups[1] + 1)
+
+
+@test(parametric=test_memory_move_nonstop_generator)
+def test_memory_move_nonstop_ap_to_mp(
+    video: VideoChip,
+    cmd: int,
+    num_blocks: int,
+):
+    # Set TGS to ensure the chip is in a valid video mode.
+    match video.chip_type:
+        case VideoChipType.EF9345:
+            video.R1 = 0x10
+        case VideoChipType.TS9347:
+            video.R1 = 0x00
+    video.ER0 = 0x81
+    video.wait_not_busy()
+
+    # Initially set the whole page to zero.
+    video.R1 = 0x00
+    video.R2 = 0x00
+    video.R3 = 0x00
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.ER0 = 0x05  # CLF/CLL
+    time.sleep(0.1)  # leave the command running for a while
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Fill row 0 with consective values (even on the blocks that should not be
+    # read by the move operation under test).
+    video.R6 = 0  # y
+    video.R7 = 0  # x
+    video.R0 = 0x01  # KRF/TLM with auto-increment
+    for i in range(40):
+        video.R1 = (1 << 6) | i
+        video.R2 = (2 << 6) | i
+        video.ER3 = (3 << 6) | i
+        video.wait_not_busy()
+
+    # Make MP point to (row 9, column 0) and AP to (row 0, column 1). The copy
+    # will eventually wrap and even row 8 will be written.
+    video.R4 = 0  # AP y
+    video.R5 = 1  # AP x
+    video.R6 = 9  # MP y
+    video.R7 = 0  # MP x
+    video.ER0 = cmd | 0b1000  # AP to MP
+    time.sleep(0.1)  # leave the command running for a while
+    video.ER0 = 0x91  # NOP to stop it.
+    video.wait_not_busy()
+
+    # Validate the contents of row 8.
+    video.R6 = 8  # y
+    video.R0 = 0x08  # KRF/TLM + read
+    for x in range(40):
+        video.ER7 = x  # x
+        video.wait_not_busy()
+        values = [video.R1, video.R2, video.R3]
+        for b in range(num_blocks):
+            if x != 39:
+                assert values[b] == ((b + 1) << 6) | (x + 1)
+            else:
+                assert values[b] == ((b + 1) << 6) | 0
 
 
 # Command types:
